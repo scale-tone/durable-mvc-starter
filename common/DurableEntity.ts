@@ -4,7 +4,7 @@ import { IEntityFunctionContext } from 'durable-functions/lib/src/classes';
 import { EntityStateChangedMessage } from '../ui/src/shared/common/SignalRNotifications';
 import { ISetEntityMetadataRequest } from '../ui/src/shared/common/ISetEntityMetadataRequest';
 import { SignalRClientHandlerName, UpdateMetadataServiceMethodName } from '../ui/src/shared/common/Constants';
-import { StateContainer } from './StateContainer';
+import { DurableEntityStateContainer, DurableEntityStateMetadata } from './DurableEntityStateContainer';
 import { SignalArgumentContainer } from './SignalArgumentContainer';
 
 // Levels of visibility currently supported
@@ -20,12 +20,17 @@ export class DurableEntity<TState extends object,> {
     // Entity state
     protected get state(): TState { return this._stateContainer.state; }
 
+    // Entity state metadata
+    protected get stateMetadata(): DurableEntityStateMetadata { return this._stateContainer.__metadata; }
+
     // To be called by entity, when it decides to kill itself
     protected destructOnExit(): void {
         this._destructOnExit = true;
     }
 
     constructor(protected _context: IEntityFunctionContext) {
+
+        this._context.df.signalEntity
     }
 
     // Override this to provide the state for a newly created entity
@@ -42,18 +47,23 @@ export class DurableEntity<TState extends object,> {
 
         const argumentContainer = this._context.df.getInput() as SignalArgumentContainer;
 
+        // If the signal was sent by our manage-entities method, then it should contain __metadata field with user name in it
+        const signalMetadata = argumentContainer.__metadata;
+        const signalArgument = (!signalMetadata) ? argumentContainer : argumentContainer.argument;
+        const callingUser = signalMetadata?.callingUser;
+
         // Loading actor's state
-        this._stateContainer = this._context.df.getState(() => new StateContainer(
+        this._stateContainer = this._context.df.getState(() => new DurableEntityStateContainer(
             this.initializeState(),
             this.visibility,
-            argumentContainer.callingUser
-        )) as StateContainer<TState>;
+            callingUser
+        )) as DurableEntityStateContainer<TState>;
 
         // Always notifying about newly created entities
-        var metadataHasChanged = !this._stateContainer.version;
+        var metadataHasChanged = !this._stateContainer.__metadata.version;
 
         // Checking access rights
-        if (!StateContainer.isAccessAllowed(this._stateContainer, argumentContainer.callingUser)) {
+        if (!DurableEntityStateContainer.isAccessAllowed(this._stateContainer, callingUser)) {
             throw new Error(`Access to @${this._context.df.entityName}@${this._context.df.entityKey} not allowed`);
         }
 
@@ -64,14 +74,14 @@ export class DurableEntity<TState extends object,> {
         if (operationName === UpdateMetadataServiceMethodName) { // if this is a service method
 
             // Only the owner can update metadata
-            if (this._stateContainer.owner !== argumentContainer.callingUser) {
+            if (this._stateContainer.__metadata.owner !== callingUser) {
                 throw new Error(`Non-owner is not allowed to update metadata of @${this._context.df.entityName}@${this._context.df.entityKey}`);
             }
 
             // Currently only one metadata field can be updated
-            const setMetadataRequest = argumentContainer.argument as ISetEntityMetadataRequest;
+            const setMetadataRequest = signalArgument as ISetEntityMetadataRequest;
             if (!!setMetadataRequest?.allowedUsers) {
-                this._stateContainer.allowedUsers = argumentContainer.argument.allowedUsers;
+                this._stateContainer.__metadata.allowedUsers = signalArgument.allowedUsers;
             }
 
             metadataHasChanged = true;
@@ -94,7 +104,7 @@ export class DurableEntity<TState extends object,> {
         const stateDiff = rfc6902.createPatch(oldState, this._stateContainer.state);
 
         if (!!stateDiff.length) {
-            this._stateContainer.version++;
+            this._stateContainer.__metadata.version++;
         }
 
         // If the handler signalled the end of lifetime, then destroying ourselves
@@ -116,27 +126,27 @@ export class DurableEntity<TState extends object,> {
         }
     }
 
-    private _stateContainer: StateContainer<TState>;
+    private _stateContainer: DurableEntityStateContainer<TState>;
     private _destructOnExit: boolean = false;
 
-    private sendUpdatedStateViaSignalR(stateContainer: StateContainer<TState>, stateDiff: rfc6902.Operation[], isDestructed: boolean ) {
+    private sendUpdatedStateViaSignalR(stateContainer: DurableEntityStateContainer<TState>, stateDiff: rfc6902.Operation[], isDestructed: boolean ) {
 
         const notification: EntityStateChangedMessage = {
             entityName: this._context.df.entityId.name,
             entityKey: this._context.df.entityId.key,
             stateDiff,
-            version: stateContainer.version,
+            version: stateContainer.__metadata.version,
             isEntityDestructed: isDestructed
         };
 
         this._context.bindings.signalRMessages = [];
 
-        switch (stateContainer.visibility) {
+        switch (stateContainer.__metadata.visibility) {
             case VisibilityEnum.ToOwnerOnly:
 
                 // Sending to owner only
                 this._context.bindings.signalRMessages.push({
-                    userId: stateContainer.owner,
+                    userId: stateContainer.__metadata.owner,
                     target: SignalRClientHandlerName,
                     arguments: [notification]
                 });
@@ -145,7 +155,7 @@ export class DurableEntity<TState extends object,> {
             case VisibilityEnum.ToListOfUsers:
 
                 // Sending to all allowed users
-                stateContainer.allowedUsers.map(user => {
+                stateContainer.__metadata.allowedUsers.map(user => {
 
                     this._context.bindings.signalRMessages.push({
                         userId: user,

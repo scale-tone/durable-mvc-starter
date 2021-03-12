@@ -4,10 +4,14 @@ import { observer } from 'mobx-react';
 import { DurableEntitySet } from './common/DurableEntitySet';
 import { CounterState } from './shared/CounterState';
 
-// Setup with some fake user name. This is for testing purposes only.
-// When deployed to Azure with EasyAuth configured, this name will be replaced with your real user name.
+// Optional setup
 DurableEntitySet.setup({
-    fakeUserNameFabric: () => Promise.resolve('test-anonymous-user')
+
+    // Setup with some fake user name. This is for testing purposes only.
+    // When deployed to Azure with EasyAuth configured, this name will be replaced with your real user name.
+    fakeUserNameFactory: () => Promise.resolve('test-anonymous-user'),
+
+    logger: { log: (l, msg: string) => console.log(msg) }
 });
 
 const entityName = 'CounterEntity';
@@ -30,9 +34,9 @@ export const App = observer(
                         Decrement
                     </button>
                 </div>
-                <h4>{counterState.previousValues.length ? 'Previous values:' : ''}</h4>
+                <h4>{counterState.history.length ? 'History (last 10 values):' : ''}</h4>
                 <ul>
-                    {counterState.previousValues.map(n => (<li>{n}</li>))}
+                    {counterState.history.map(n => (<li>{n}</li>))}
                 </ul>
             </>);
         }

@@ -23,8 +23,8 @@ export class DurableHttpClient extends DefaultHttpClient {
 
             const config = this._configFabric();
 
-            if (!!config.accessTokenFabric) {
-                return config.accessTokenFabric().then(accessToken => {
+            if (!!config.accessTokenFactory) {
+                return config.accessTokenFactory().then(accessToken => {
 
                     request.headers = {}
                     request.headers['Authorization'] = 'Bearer ' + accessToken;
@@ -33,8 +33,8 @@ export class DurableHttpClient extends DefaultHttpClient {
                 });
             }
 
-            if (!!config.fakeUserNameFabric) {
-                return config.fakeUserNameFabric().then(fakeUserName => {
+            if (!!config.fakeUserNameFactory) {
+                return config.fakeUserNameFactory().then(fakeUserName => {
 
                     if (!!fakeUserName) {
                         request.headers = {}

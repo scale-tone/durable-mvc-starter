@@ -5,7 +5,7 @@ import * as rfc6902 from 'rfc6902';
 import { ISetEntityMetadataRequest } from '../shared/common/ISetEntityMetadataRequest';
 import { EntityStateChangedMessage } from '../shared/common/SignalRNotifications';
 import { SignalRClientHandlerName, UpdateMetadataServiceMethodName } from '../shared/common/Constants';
-import { ClientStateContainer } from '../shared/common/ClientStateContainer';
+import { DurableEntityClientStateContainer } from '../shared/common/DurableEntityClientStateContainer';
 import { IDurableEntitySetConfig } from './IDurableEntitySetConfig';
 import { DurableHttpClient } from './DurableHttpClient';
 
@@ -136,11 +136,11 @@ export class DurableEntitySet<TEntityState extends object> {
     private static HttpClient: DurableHttpClient = new DurableHttpClient(() => DurableEntitySet.Config);
 
     private static EntitySets: { [entityName: string]: EntityStateWithKey[] } = {};
-    private static EntityStates: { [entityId: string]: ClientStateContainer } = {};
+    private static EntityStates: { [entityId: string]: DurableEntityClientStateContainer } = {};
     private static SignalRConn: HubConnection;
 
     private static readonly SignalRReconnectIntervalInMs = 5000;
-    private static readonly MaxRetryCount = 5;
+    private static readonly MaxRetryCount = 6;
     private static readonly RetryBaseIntervalMs = 500;
 
     private static entityAdded(entityName: string, entityKey: string, entityState: EntityStateWithKey) {
@@ -185,10 +185,11 @@ export class DurableEntitySet<TEntityState extends object> {
         const uri = `${process.env.REACT_APP_BACKEND_BASE_URI}/entities/${entityName}/${entityKey}`;
         this.HttpClient.get(uri).then(response => {
 
-            const stateContainer = JSON.parse(response.content as string) as ClientStateContainer;
-            
+            const stateContainer = JSON.parse(response.content as string) as DurableEntityClientStateContainer;
+            const entityId = EntityStateChangedMessage.FormatEntityId(entityName, entityKey);
+
             if (!!desiredVersion && (stateContainer.version < desiredVersion)) {
-                throw new Error(`Expected @${entityName}@${entityKey} of version ${desiredVersion}, but got version ${stateContainer.version}`);
+                throw new Error(`Expected ${entityId} of version ${desiredVersion}, but got version ${stateContainer.version}`);
             }
 
             if (!currentEntityState) {
@@ -204,8 +205,6 @@ export class DurableEntitySet<TEntityState extends object> {
                 const diff = rfc6902.createPatch(currentEntityState, stateContainer.state);
                 rfc6902.applyPatch(currentEntityState, diff);
             }
-
-            const entityId = EntityStateChangedMessage.FormatEntityId(entityName, entityKey);
 
             if (!this.EntityStates[entityId]) {
                 
@@ -244,7 +243,7 @@ export class DurableEntitySet<TEntityState extends object> {
 
                 const entityKey = item.entityKey;
                 const entityId = EntityStateChangedMessage.FormatEntityId(entityName, entityKey);
-                const stateContainer = item as ClientStateContainer;
+                const stateContainer = item as DurableEntityClientStateContainer;
 
                 makeAutoObservable(stateContainer.state);
                 this.EntityStates[entityId] = stateContainer;
@@ -261,6 +260,8 @@ export class DurableEntitySet<TEntityState extends object> {
     private static entityStateChangedMessageHandler(msg: EntityStateChangedMessage): void {
 
         const entityId = EntityStateChangedMessage.GetEntityId(msg);
+
+        this.Config.logger!.log(LogLevel.Trace, `DurableEntitySet: ${entityId} changed to version ${msg.version}`);
 
         if (msg.isEntityDestructed) {
 

@@ -2,8 +2,8 @@ import { Context, HttpRequest } from "@azure/functions"
 import * as DurableFunctions from 'durable-functions'
 
 import { SignalArgumentContainer } from '../common/SignalArgumentContainer';
-import { StateContainer } from '../common/StateContainer';
-import { ClientStateContainer } from '../ui/src/shared/common/ClientStateContainer';
+import { DurableEntityStateContainer } from '../common/DurableEntityStateContainer';
+import { DurableEntityClientStateContainer } from '../ui/src/shared/common/DurableEntityClientStateContainer';
 import { ClientPrincipalHeaderName } from '../ui/src/shared/common/Constants';
 
 // Handles basic operations 
@@ -20,7 +20,7 @@ export default async function (context: Context, req: HttpRequest): Promise<void
         
         await durableClient.signalEntity(new DurableFunctions.EntityId(entityName, entityKey),
             signalName,
-            <SignalArgumentContainer> { argument: req.body, callingUser }
+            <SignalArgumentContainer>{ argument: req.body, __metadata: { callingUser } }
         );
 
     } else if (!entityKey) {
@@ -38,16 +38,16 @@ export default async function (context: Context, req: HttpRequest): Promise<void
                     stateContainer = JSON.parse(stateContainer);
                 }
 
-                return { instanceId: s.instanceId, stateContainer: stateContainer as StateContainer<any> };
+                return { instanceId: s.instanceId, stateContainer: stateContainer as DurableEntityStateContainer<any> };
             })
 
             // Checking access rights
-            .filter(s => StateContainer.isAccessAllowed(s.stateContainer, callingUser))
+            .filter(s => DurableEntityStateContainer.isAccessAllowed(s.stateContainer, callingUser))
 
             // Converting to ClientStateContainer
-            .map(s => <ClientStateContainer> {
+            .map(s => <DurableEntityClientStateContainer> {
                 entityKey: s.instanceId.substr(entityNameString.length),
-                version: s.stateContainer.version,
+                version: s.stateContainer.__metadata.version,
                 state: s.stateContainer.state
             });
 
@@ -63,13 +63,13 @@ export default async function (context: Context, req: HttpRequest): Promise<void
 
         } else {
 
-            const stateContainer = stateResponse.entityState as StateContainer<any>;
+            const stateContainer = stateResponse.entityState as DurableEntityStateContainer<any>;
 
-            if (StateContainer.isAccessAllowed(stateContainer, callingUser)) {
+            if (DurableEntityStateContainer.isAccessAllowed(stateContainer, callingUser)) {
                 
                 context.res = {
-                    body: <ClientStateContainer>{
-                        version: stateContainer.version,
+                    body: <DurableEntityClientStateContainer>{
+                        version: stateContainer.__metadata.version,
                         state: stateContainer.state
                     }
                 };

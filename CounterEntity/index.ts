@@ -7,12 +7,16 @@ import { CounterState } from '../ui/src/shared/CounterState';
 class CounterEntity extends DurableEntity<CounterState>
 {
     async add(value: number) {
-        this.state.previousValues.push(this.state.countContainer.count);
+        this.state.history.unshift(this.state.countContainer.count);
+        this.state.history.splice(10, 1);
+
         this.state.countContainer.count += value;
     }
 
     async substract(value: number) {
-        this.state.previousValues.push(this.state.countContainer.count);
+        this.state.history.unshift(this.state.countContainer.count);
+        this.state.history.splice(10, 1);
+
         this.state.countContainer.count -= value;
     }
 

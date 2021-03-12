@@ -8,5 +8,5 @@ export class CounterState
         count: 0
     }
 
-    previousValues: number[] = [];
+    history: number[] = [];
 }
