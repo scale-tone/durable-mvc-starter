@@ -86,8 +86,8 @@ typings/
 # DynamoDB Local files
 .dynamodb/
 
-# TypeScript output
-dist
+# TypeScript output (keeping the dist folder, to enable ARM deployment)
+# dist 
 out
 
 # Azure Functions artifacts
