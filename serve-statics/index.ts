@@ -28,10 +28,6 @@ export default async function (context: Context): Promise<void> {
             fileName: `${wwwroot}/static/media/${p3}`,
             contentType: 'image/svg+xml; charset=UTF-8'
         },
-        'manifest.json/undefined': {
-            fileName: `${wwwroot}/manifest.json`,
-            contentType: 'application/json; charset=UTF-8'
-        },
         'favicon.ico/undefined': {
             fileName: `${wwwroot}/favicon.ico`,
             contentType: 'image/ico'
