@@ -1,4 +1,5 @@
 
+// Sample entity state
 export class CounterState
 {
     title: string = '';
