@@ -1,0 +1,21 @@
+{
+  "name": "durable-mvc-starter",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "tsc & (cd .\\ui & npm install & npm run build)",
+    "watch": "tsc -w",
+    "prestart": "npm run build",
+    "start": "func start",
+    "test": "echo \"No tests yet...\""
+  },
+  "dependencies": {
+    "durable-functions": "^1.4.6",
+    "rfc6902": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^14.6.2",
+    "@azure/functions": "^1.2.2",
+    "typescript": "^3.6.4"
+  }
+}
