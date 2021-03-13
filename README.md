@@ -47,5 +47,5 @@ In a matter of seconds a new instance of [CounterEntity](https://github.com/scal
 You can deploy the contents of this same repo with this
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fscale-tone%2Fdurable-mvc-starter%2Fmain%2Farm-template.json) button. It will create a Function App instance, an underlying Storage account and an Azure SignalR service instance. *Don't forget to remove those resources once done.*
 
-Once you cloned this repo and added code to your copy, you then deploy it [in the same way as you would normally deploy an Azure Functions Node.js project](https://docs.microsoft.com/en-us/azure/azure-functions/functions-reference-node?tabs=v2#deploying-with-dependencies).
+Once you cloned this repo and added some code to your copy, you then deploy it [in the same way as you would normally deploy an Azure Functions Node.js project](https://docs.microsoft.com/en-us/azure/azure-functions/functions-reference-node?tabs=v2#deploying-with-dependencies).
 
