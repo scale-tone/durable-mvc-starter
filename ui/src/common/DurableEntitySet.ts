@@ -12,10 +12,10 @@ import { DurableHttpClient } from './DurableHttpClient';
 export type EntityStateWithKey = { entityKey: string };
 
 // Client-side container for Durable Entities
-export class DurableEntitySet<TEntityState extends object> {
+export class DurableEntitySet<TState extends object> {
 
     // All attached entities will appear in this observable array
-    items: (TEntityState & EntityStateWithKey)[] = [];
+    items: (TState & EntityStateWithKey)[] = [];
     
     constructor(private _entityName: string, attachToAll: boolean = true) {
 
@@ -76,7 +76,7 @@ export class DurableEntitySet<TEntityState extends object> {
     }
 
     // Produces a single observable state instance for an existing entity
-    static attachEntity<TEntityState extends object>(entityName: string, entityKey: string, initialState: TEntityState): TEntityState {
+    static attachEntity<TState extends object>(entityName: string, entityKey: string, initialState: TState): TState {
 
         DurableEntitySet.initSignalR();
 
@@ -86,7 +86,7 @@ export class DurableEntitySet<TEntityState extends object> {
         const entityId = EntityStateChangedMessage.FormatEntityId(entityName, entityKey);
         if (!!this.EntityStates[entityId]) {
             // If it is a known entity, then just returning it
-            return this.EntityStates[entityId].state as TEntityState;
+            return this.EntityStates[entityId].state as TState;
         }
 
         if (!!initialState) {
@@ -100,7 +100,7 @@ export class DurableEntitySet<TEntityState extends object> {
     }
 
     // Creates (or fetches existing) and produces a single observable state instance for a newly created entity
-    static createEntity<TEntityState extends object>(entityName: string, entityKey: string, initialState: TEntityState): TEntityState {
+    static createEntity<TState extends object>(entityName: string, entityKey: string, initialState: TState): TState {
 
         // This empty request will create the entity, if it doesn't exist yet.
         this.updateEntityMetadata(entityName, entityKey, {});
