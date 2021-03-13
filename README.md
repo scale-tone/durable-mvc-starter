@@ -6,10 +6,46 @@ The gist of this architectural approach is to define a strongly-typed state (a T
 
 The project in this repo is technically an [Azure Functions Node.js project](https://docs.microsoft.com/en-us/azure/azure-functions/functions-reference-node?tabs=v2#typescript) with all code intended to be written in TypeScript. And it includes the following scaffolding:
 1. Client-side React+MobX+TypeScript project located in [this `/ui` sub-folder](https://github.com/scale-tone/durable-mvc-starter/tree/main/ui). It is automatically (re)built along with the main project, and its output (static HTML/JS/CSS files) is served with [this `serve-statics` Function](https://github.com/scale-tone/durable-mvc-starter/blob/main/serve-statics/index.ts). TypeScript class definitions placed into [this `/ui/src/shared` folder](https://github.com/scale-tone/durable-mvc-starter/tree/main/ui/src/shared) are shared by both server and client projects, so this is where you define your states.
-2. Server-side base classes that allow to define and implement your Durable Entities with a class-based syntax. You derive your Entity class from [DurableEntity\<TState\>](https://github.com/scale-tone/durable-mvc-starter/blob/main/common/DurableEntity.ts) and implement your signal handlers in form of methods. The state is available to you via `this.state` property and it is automatically loaded/persisted and propagated to the client. Then you can send signals to your Entity [via this server-side `DurableEntityProxy\<TEntity\>` helper](https://github.com/scale-tone/durable-mvc-starter/blob/main/common/DurableEntityProxy.ts) and/or via [this client-side `DurableEntitySet.signalEntity()` method](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L112).
+2. Server-side base classes that allow to define and implement your Durable Entities with a class-based syntax. You derive your Entity class from [DurableEntity\<TState\>](https://github.com/scale-tone/durable-mvc-starter/blob/main/common/DurableEntity.ts) and implement your signal handlers in form of methods. The state is available to you via `this.state` property and it is automatically loaded/persisted and propagated to the client. Then you can send signals to your Entity [via this server-side `DurableEntityProxy<TEntity>` helper](https://github.com/scale-tone/durable-mvc-starter/blob/main/common/DurableEntityProxy.ts) and/or via [this client-side `DurableEntitySet.signalEntity()` method](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L112).
 3. [This `negotiate-signalr` function](https://github.com/scale-tone/durable-mvc-starter/blob/main/negotiate-signalr/index.ts), that allows the client to connect to [Azure SignalR](https://docs.microsoft.com/en-us/azure/azure-signalr/signalr-overview).
 4. [This `manage-entities` function](https://github.com/scale-tone/durable-mvc-starter/blob/main/manage-entities/index.ts), that exposes Entity states to the client and handles signals sent from it.
 5. A basic sample Entity. [Here is its state](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/shared/CounterState.ts), [here is its class](https://github.com/scale-tone/durable-mvc-starter/blob/main/CounterEntity/index.ts) and [here is its rendering](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/App.tsx#L26).
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fscale-tone%2Fdurable-mvc-starter%2Fmain%2Farm-template.json) 
+More examples are coming in form of a separate repo.
+
+# Prerequisites
+* [Azure Functions Core Tools](https://www.npmjs.com/package/azure-functions-core-tools) **globally** installed on your devbox.
+* An instance of Azure SignalR Service [configured in Serverless mode](https://docs.microsoft.com/en-us/azure/azure-signalr/concept-service-mode#serverless-mode).
+
+# How to run locally
+
+* Clone this repo.
+* In the main project's root folder (the one that contains host.json) create a **local.settings.json** file, which should look like this:
+  ```
+  {
+      "IsEncrypted": false,
+      "Values": {
+          "AzureWebJobsStorage": "<connection-string-to-your-azure-storage-account>",
+          "AzureSignalRConnectionString": "<connection-string-to-your-azure-signalr-service-instance>",
+          "AzureSignalRHubName": "DurableMvcTestHub",
+          "FUNCTIONS_WORKER_RUNTIME": "node"
+      }
+  }
+  ```
+* In that same root folder run:
+  ```
+  npm install
+  npm run build
+  func start
+  ```
+* Navigate to `http://localhost:7071` with your browser.
+
+In a matter of seconds a new instance of [CounterEntity](https://github.com/scale-tone/durable-mvc-starter/blob/main/CounterEntity/index.ts) will be created and rendered in your browser. Try to open that page in multiple browser tabs and observe the state being automatically synchronized across them. Also try to kill/restart the Functions host process (func.exe) and observe the state being preserved.
+
+# How to deploy to Azure
+
+You can deploy the contents of this same repo with this
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fscale-tone%2Fdurable-mvc-starter%2Fmain%2Farm-template.json) button. It will create a Function App instance, an underlying Storage account and an Azure SignalR service instance. *Don't forget to remove those resources once done.*
+
+Once you cloned this repo and added code to your copy, you then deploy it [in the same way as you would normally deploy an Azure Functions Node.js project](https://docs.microsoft.com/en-us/azure/azure-functions/functions-reference-node?tabs=v2#deploying-with-dependencies).
 
