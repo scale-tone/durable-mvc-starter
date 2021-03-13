@@ -15,7 +15,7 @@ export enum VisibilityEnum {
 }
 
 // Base class for Durable Entities. Implements handling signals (by calling child's method with corresponding name)
-export class DurableEntity<TState extends object,> {
+export class DurableEntity<TState extends object> {
 
     // Entity state
     protected get state(): TState { return this._stateContainer.state; }
