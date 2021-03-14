@@ -27,7 +27,7 @@ function default_1(context, req) {
         else if (!entityKey) {
             const entityNameString = `@${entityName}@`;
             const statuses = (yield durableClient.getStatusAll())
-                // Filtering out entities
+                // We're only interested in entities
                 .filter(s => { var _a; return ((_a = s.input) === null || _a === void 0 ? void 0 : _a.exists) === true && s.instanceId.startsWith(entityNameString); })
                 .map(s => {
                 var _a;

@@ -9,7 +9,7 @@ DurableEntitySet.setup({
 
     // Setup with some fake user name. This is for testing purposes only.
     // When deployed to Azure with EasyAuth configured, this name will be replaced with your real user name.
-    fakeUserNameFactory: () => Promise.resolve('test-anonymous-user'),
+    fakeUserNamePromise: Promise.resolve('test-anonymous-user'),
 
     logger: { log: (l, msg: string) => console.log(msg) }
 });

@@ -16,6 +16,7 @@ const DurableEntityStateContainer_1 = require("./DurableEntityStateContainer");
 // Levels of visibility currently supported
 var VisibilityEnum;
 (function (VisibilityEnum) {
+    VisibilityEnum[VisibilityEnum["ToNobody"] = -1] = "ToNobody";
     VisibilityEnum[VisibilityEnum["ToOwnerOnly"] = 0] = "ToOwnerOnly";
     VisibilityEnum[VisibilityEnum["ToListOfUsers"] = 1] = "ToListOfUsers";
     VisibilityEnum[VisibilityEnum["ToEveryone"] = 2] = "ToEveryone";
@@ -31,10 +32,10 @@ class DurableEntity {
     get state() { return this._stateContainer.state; }
     // Entity state metadata
     get stateMetadata() { return this._stateContainer.__metadata; }
+    // Incoming signal metadata
+    get callingUser() { return this._callingUser; }
     // To be called by entity, when it decides to kill itself
-    destructOnExit() {
-        this._destructOnExit = true;
-    }
+    destructOnExit() { this._destructOnExit = true; }
     // Override this to provide the state for a newly created entity
     initializeState() {
         return {};
@@ -49,13 +50,13 @@ class DurableEntity {
             // If the signal was sent by our manage-entities method, then it should contain __metadata field with user name in it
             const signalMetadata = argumentContainer.__metadata;
             const signalArgument = (!signalMetadata) ? argumentContainer : argumentContainer.argument;
-            const callingUser = signalMetadata === null || signalMetadata === void 0 ? void 0 : signalMetadata.callingUser;
+            this._callingUser = signalMetadata === null || signalMetadata === void 0 ? void 0 : signalMetadata.callingUser;
             // Loading actor's state
-            this._stateContainer = this._context.df.getState(() => new DurableEntityStateContainer_1.DurableEntityStateContainer(this.initializeState(), this.visibility, callingUser));
+            this._stateContainer = this._context.df.getState(() => new DurableEntityStateContainer_1.DurableEntityStateContainer(this.initializeState(), this.visibility, this._callingUser));
             // Always notifying about newly created entities
             var metadataHasChanged = !this._stateContainer.__metadata.version;
             // Checking access rights
-            if (!DurableEntityStateContainer_1.DurableEntityStateContainer.isAccessAllowed(this._stateContainer, callingUser)) {
+            if (!DurableEntityStateContainer_1.DurableEntityStateContainer.isAccessAllowed(this._stateContainer, this._callingUser)) {
                 throw new Error(`Access to @${this._context.df.entityName}@${this._context.df.entityKey} not allowed`);
             }
             // Cloning the state
@@ -63,7 +64,7 @@ class DurableEntity {
             const operationName = this._context.df.operationName;
             if (operationName === Constants_1.UpdateMetadataServiceMethodName) { // if this is a service method
                 // Only the owner can update metadata
-                if (this._stateContainer.__metadata.owner !== callingUser) {
+                if (this._stateContainer.__metadata.owner !== this._callingUser) {
                     throw new Error(`Non-owner is not allowed to update metadata of @${this._context.df.entityName}@${this._context.df.entityKey}`);
                 }
                 // Currently only one metadata field can be updated
@@ -104,6 +105,9 @@ class DurableEntity {
         });
     }
     sendUpdatedStateViaSignalR(stateContainer, stateDiff, isDestructed) {
+        if (stateContainer.__metadata.visibility === VisibilityEnum.ToNobody) {
+            return;
+        }
         const notification = {
             entityName: this._context.df.entityId.name,
             entityKey: this._context.df.entityId.key,

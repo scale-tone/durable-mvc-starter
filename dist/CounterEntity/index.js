@@ -14,6 +14,7 @@ const DurableEntity_1 = require("../Common/DurableEntity");
 const CounterState_1 = require("../ui/src/shared/CounterState");
 // Sample counter entity
 class CounterEntity extends DurableEntity_1.DurableEntity {
+    // This method is async just to demonstrate, that your entity does can have both sync and async methods
     add(value) {
         return __awaiter(this, void 0, void 0, function* () {
             this.state.history.unshift(this.state.countContainer.count);
@@ -22,11 +23,9 @@ class CounterEntity extends DurableEntity_1.DurableEntity {
         });
     }
     substract(value) {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.state.history.unshift(this.state.countContainer.count);
-            this.state.history.splice(10, 1);
-            this.state.countContainer.count -= value;
-        });
+        this.state.history.unshift(this.state.countContainer.count);
+        this.state.history.splice(10, 1);
+        this.state.countContainer.count -= value;
     }
     // Overriding visibility
     get visibility() { return DurableEntity_1.VisibilityEnum.ToEveryone; }

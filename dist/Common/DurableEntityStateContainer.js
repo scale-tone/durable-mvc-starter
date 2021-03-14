@@ -44,6 +44,9 @@ class DurableEntityStateContainer {
     }
     // Checks if a given user has access to this entity
     static isAccessAllowed(stateContainer, user) {
+        if (!stateContainer.__metadata) {
+            return false;
+        }
         return DurableEntityStateMetadata.isAccessAllowed(stateContainer.__metadata, user);
     }
 }

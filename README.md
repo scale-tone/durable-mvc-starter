@@ -12,7 +12,7 @@ The project in this repo is technically a pre-configured [Azure Functions Node.j
 5. [This `manage-entities` function](https://github.com/scale-tone/durable-mvc-starter/blob/main/manage-entities/index.ts), that exposes Entity states to the client and handles signals sent from it.
 6. A basic sample Entity. [Here is its state](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/shared/CounterState.ts), [here is its class](https://github.com/scale-tone/durable-mvc-starter/blob/main/CounterEntity/index.ts) and [here is its rendering](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/App.tsx#L26).
 
-More examples are coming in form of a separate repo.
+More examples you can find in [this separate repo](https://github.com/scale-tone/durable-mvc-samples).
 
 # Prerequisites
 * [Azure Functions Core Tools](https://www.npmjs.com/package/azure-functions-core-tools) **globally** installed on your devbox.

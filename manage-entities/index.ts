@@ -27,7 +27,7 @@ export default async function (context: Context, req: HttpRequest): Promise<void
 
         const entityNameString = `@${entityName}@`;
         const statuses = (await durableClient.getStatusAll())
-            // Filtering out entities
+            // We're only interested in entities
             .filter(s => (s.input as any)?.exists === true && s.instanceId.startsWith(entityNameString))
             .map(s => {
 

@@ -7,7 +7,7 @@ import { EntityStateChangedMessage } from '../shared/common/SignalRNotifications
 import { SignalRClientHandlerName, UpdateMetadataServiceMethodName } from '../shared/common/Constants';
 import { DurableEntityClientStateContainer } from '../shared/common/DurableEntityClientStateContainer';
 import { IDurableEntitySetConfig } from './IDurableEntitySetConfig';
-import { DurableHttpClient } from './DurableHttpClient';
+import { DurableHttpClient, BackendBaseUri } from './DurableHttpClient';
 
 export type EntityStateWithKey = { entityKey: string };
 
@@ -114,7 +114,7 @@ export class DurableEntitySet<TState extends object> {
         // Inside Durable Functions entity names are always lower-case, so we need to convert
         entityName = entityName.toLowerCase();
 
-        const uri = `${process.env.REACT_APP_BACKEND_BASE_URI}/entities/${entityName}/${entityKey}/${signalName}`;
+        const uri = `${BackendBaseUri}/entities/${entityName}/${entityKey}/${signalName}`;
         return this.HttpClient.post(uri, { content: JSON.stringify(argument) }).then();
     }
 
@@ -182,7 +182,7 @@ export class DurableEntitySet<TState extends object> {
 
     private static fetchAndApplyEntityState(entityName: string, entityKey: string, desiredVersion: number, retryCount: number, currentEntityState: any = null): void {
 
-        const uri = `${process.env.REACT_APP_BACKEND_BASE_URI}/entities/${entityName}/${entityKey}`;
+        const uri = `${BackendBaseUri}/entities/${entityName}/${entityKey}`;
         this.HttpClient.get(uri).then(response => {
 
             const stateContainer = JSON.parse(response.content as string) as DurableEntityClientStateContainer;
@@ -236,7 +236,7 @@ export class DurableEntitySet<TState extends object> {
 
     private static fetchAndApplyAllEntityStates(entityName: string): void {
 
-        const uri = `${process.env.REACT_APP_BACKEND_BASE_URI}/entities/${entityName}`;
+        const uri = `${BackendBaseUri}/entities/${entityName}`;
         this.HttpClient.get(uri).then(response => {
 
             for (var item of JSON.parse(response.content as string)) {
@@ -303,7 +303,7 @@ export class DurableEntitySet<TState extends object> {
 
         // Configuring SignalR
         this.SignalRConn = new HubConnectionBuilder()
-            .withUrl(`${process.env.REACT_APP_BACKEND_BASE_URI}`, { httpClient: this.HttpClient, logger: this.Config.logger })
+            .withUrl(`${BackendBaseUri}`, { httpClient: this.HttpClient, logger: this.Config.logger })
             .build();
 
         // Mounting the event handler

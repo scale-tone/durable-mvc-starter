@@ -9,6 +9,7 @@ import { SignalArgumentContainer } from './SignalArgumentContainer';
 
 // Levels of visibility currently supported
 export enum VisibilityEnum {
+    ToNobody = -1, // This turns off state propagation
     ToOwnerOnly = 0,
     ToListOfUsers,
     ToEveryone
@@ -23,10 +24,11 @@ export class DurableEntity<TState extends object> {
     // Entity state metadata
     protected get stateMetadata(): DurableEntityStateMetadata { return this._stateContainer.__metadata; }
 
+    // Incoming signal metadata
+    protected get callingUser(): string { return this._callingUser; }
+
     // To be called by entity, when it decides to kill itself
-    protected destructOnExit(): void {
-        this._destructOnExit = true;
-    }
+    protected destructOnExit(): void { this._destructOnExit = true; }
 
     constructor(protected _context: IEntityFunctionContext) {
 
@@ -50,20 +52,20 @@ export class DurableEntity<TState extends object> {
         // If the signal was sent by our manage-entities method, then it should contain __metadata field with user name in it
         const signalMetadata = argumentContainer.__metadata;
         const signalArgument = (!signalMetadata) ? argumentContainer : argumentContainer.argument;
-        const callingUser = signalMetadata?.callingUser;
+        this._callingUser = signalMetadata?.callingUser;
 
         // Loading actor's state
         this._stateContainer = this._context.df.getState(() => new DurableEntityStateContainer(
             this.initializeState(),
             this.visibility,
-            callingUser
+            this._callingUser
         )) as DurableEntityStateContainer<TState>;
 
         // Always notifying about newly created entities
         var metadataHasChanged = !this._stateContainer.__metadata.version;
 
         // Checking access rights
-        if (!DurableEntityStateContainer.isAccessAllowed(this._stateContainer, callingUser)) {
+        if (!DurableEntityStateContainer.isAccessAllowed(this._stateContainer, this._callingUser)) {
             throw new Error(`Access to @${this._context.df.entityName}@${this._context.df.entityKey} not allowed`);
         }
 
@@ -74,7 +76,7 @@ export class DurableEntity<TState extends object> {
         if (operationName === UpdateMetadataServiceMethodName) { // if this is a service method
 
             // Only the owner can update metadata
-            if (this._stateContainer.__metadata.owner !== callingUser) {
+            if (this._stateContainer.__metadata.owner !== this._callingUser) {
                 throw new Error(`Non-owner is not allowed to update metadata of @${this._context.df.entityName}@${this._context.df.entityKey}`);
             }
 
@@ -127,9 +129,14 @@ export class DurableEntity<TState extends object> {
     }
 
     private _stateContainer: DurableEntityStateContainer<TState>;
+    private _callingUser: string;
     private _destructOnExit: boolean = false;
 
     private sendUpdatedStateViaSignalR(stateContainer: DurableEntityStateContainer<TState>, stateDiff: rfc6902.Operation[], isDestructed: boolean ) {
+
+        if (stateContainer.__metadata.visibility === VisibilityEnum.ToNobody) {
+            return;
+        }
 
         const notification: EntityStateChangedMessage = {
             entityName: this._context.df.entityId.name,

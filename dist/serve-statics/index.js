@@ -36,7 +36,7 @@ function default_1(context) {
             },
             'favicon.ico/undefined': {
                 fileName: `${wwwroot}/favicon.ico`,
-                contentType: 'image/ico'
+                contentType: 'image/x-icon'
             },
             'logo192.png/undefined': {
                 fileName: `${wwwroot}/logo192.png`,

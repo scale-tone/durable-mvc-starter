@@ -47,6 +47,9 @@ export class DurableEntityStateContainer<TState> {
 
     // Checks if a given user has access to this entity
     static isAccessAllowed(stateContainer: DurableEntityStateContainer<any>, user: string): boolean {
+        if (!stateContainer.__metadata) {
+            return false;
+        }
         return DurableEntityStateMetadata.isAccessAllowed(stateContainer.__metadata, user);
     }
 }

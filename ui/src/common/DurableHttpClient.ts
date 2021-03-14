@@ -3,6 +3,8 @@ import { DefaultHttpClient, HttpRequest, HttpResponse, NullLogger } from '@aspne
 import { IDurableEntitySetConfig } from './IDurableEntitySetConfig';
 import { ClientPrincipalHeaderName } from '../shared/common/Constants';
 
+export const BackendBaseUri = '/a/p/i';
+
 // Custom HttpClient implementation for the purposes of DurableEntitySet
 export class DurableHttpClient extends DefaultHttpClient {
 
@@ -19,7 +21,7 @@ export class DurableHttpClient extends DefaultHttpClient {
             path = '/' + path.split('/').slice(3).join('/');
         }
 
-        if (path.includes(process.env.REACT_APP_BACKEND_BASE_URI!)) {
+        if (path.includes(BackendBaseUri)) {
 
             const config = this._configFabric();
 
@@ -33,8 +35,8 @@ export class DurableHttpClient extends DefaultHttpClient {
                 });
             }
 
-            if (!!config.fakeUserNameFactory) {
-                return config.fakeUserNameFactory().then(fakeUserName => {
+            if (!!config.fakeUserNamePromise) {
+                return config.fakeUserNamePromise.then(fakeUserName => {
 
                     if (!!fakeUserName) {
                         request.headers = {}

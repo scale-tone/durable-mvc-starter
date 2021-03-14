@@ -9,7 +9,7 @@ export interface IDurableEntitySetConfig {
 
     // FOR TESTING PURPOSES ONLY a fake/test user name to login to SignalR and the backend.
     // Will only work when running locally (when deployed to Azure it will be overriden by EasyAuth).
-    fakeUserNameFactory?: () => Promise<string | null>;
+    fakeUserNamePromise?: Promise<string | null>;
 
     // Custom logger implementation
     logger?: ILogger;

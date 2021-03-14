@@ -6,6 +6,7 @@ import { CounterState } from '../ui/src/shared/CounterState';
 // Sample counter entity
 class CounterEntity extends DurableEntity<CounterState>
 {
+    // This method is async just to demonstrate, that your entity does can have both sync and async methods
     async add(value: number) {
         this.state.history.unshift(this.state.countContainer.count);
         this.state.history.splice(10, 1);
@@ -13,7 +14,7 @@ class CounterEntity extends DurableEntity<CounterState>
         this.state.countContainer.count += value;
     }
 
-    async substract(value: number) {
+    substract(value: number) {
         this.state.history.unshift(this.state.countContainer.count);
         this.state.history.splice(10, 1);
 
