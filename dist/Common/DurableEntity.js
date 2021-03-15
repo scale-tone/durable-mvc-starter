@@ -26,7 +26,6 @@ class DurableEntity {
     constructor(_context) {
         this._context = _context;
         this._destructOnExit = false;
-        this._context.df.signalEntity;
     }
     // Entity state
     get state() { return this._stateContainer.state; }

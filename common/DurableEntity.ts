@@ -31,8 +31,6 @@ export class DurableEntity<TState extends object> {
     protected destructOnExit(): void { this._destructOnExit = true; }
 
     constructor(protected _context: IEntityFunctionContext) {
-
-        this._context.df.signalEntity
     }
 
     // Override this to provide the state for a newly created entity
