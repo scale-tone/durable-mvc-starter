@@ -7,6 +7,6 @@
     "sourceMap": true,
     "strict": false
   },
-  "exclude": ["ui"],
+  "exclude": ["ui", "__test"],
   "include": [".", "ui/src/shared"]
 }

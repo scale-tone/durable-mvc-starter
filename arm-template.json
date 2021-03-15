@@ -6,7 +6,7 @@
             "type": "string",
             "defaultValue": "[concat('durmvc', uniqueString(resourceGroup().id))]",
             "metadata": {
-                "description": "A unique random base name for this demo setup"
+                "description": "A unique random base name for this demo setup. Lower letters only."
             }
         }
     },
