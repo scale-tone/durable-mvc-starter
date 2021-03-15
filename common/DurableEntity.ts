@@ -137,8 +137,8 @@ export class DurableEntity<TState extends object> {
         }
 
         const notification: EntityStateChangedMessage = {
-            entityName: this._context.df.entityId.name,
-            entityKey: this._context.df.entityId.key,
+            entityName: this._context.df.entityName,
+            entityKey: this._context.df.entityKey,
             stateDiff,
             version: stateContainer.__metadata.version,
             isEntityDestructed: isDestructed
