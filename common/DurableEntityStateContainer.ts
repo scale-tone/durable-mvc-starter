@@ -8,7 +8,7 @@ export class DurableEntityStateMetadata {
     constructor(public visibility: VisibilityEnum, public owner: string, public allowedUsers?: string[]) {
 
         // Adding owner to the list of allowed users
-        if (this.visibility === VisibilityEnum.ToListOfUsers && !this.allowedUsers) {
+        if (this.visibility === VisibilityEnum.ToListOfUsers && !this.allowedUsers && !!this.owner) {
             this.allowedUsers = [this.owner];
         }
     }

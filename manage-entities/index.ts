@@ -20,7 +20,7 @@ export default async function (context: Context, req: HttpRequest): Promise<void
         
         await durableClient.signalEntity(new DurableFunctions.EntityId(entityName, entityKey),
             signalName,
-            <SignalArgumentContainer>{ argument: req.body, __metadata: { callingUser } }
+            <SignalArgumentContainer>{ argument: req.body, __client_metadata: { callingUser } }
         );
 
     } else if (!entityKey) {

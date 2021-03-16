@@ -10,7 +10,7 @@ class DurableEntityStateMetadata {
         this.allowedUsers = allowedUsers;
         this.version = 0;
         // Adding owner to the list of allowed users
-        if (this.visibility === DurableEntity_1.VisibilityEnum.ToListOfUsers && !this.allowedUsers) {
+        if (this.visibility === DurableEntity_1.VisibilityEnum.ToListOfUsers && !this.allowedUsers && !!this.owner) {
             this.allowedUsers = [this.owner];
         }
     }

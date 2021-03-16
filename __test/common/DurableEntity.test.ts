@@ -10,7 +10,7 @@ test('throws when access is not allowed', async () => {
             entityKey: '123',
 
             getInput: () => { return {
-                __metadata: {
+                __client_metadata: {
                     callingUser: 'userB'
                 }
             };},
@@ -38,7 +38,7 @@ test('throws when access to metadata is not allowed', async () => {
 
             getInput: () => {
                 return {
-                    __metadata: {
+                    __client_metadata: {
                         callingUser: 'userA'
                     }
                 };
@@ -69,7 +69,7 @@ test('sends notifications when updating metadata', async () => {
 
             getInput: () => {
                 return {
-                    __metadata: {
+                    __client_metadata: {
                         callingUser: user
                     }
                 };

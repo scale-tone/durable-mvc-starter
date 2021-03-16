@@ -4,7 +4,7 @@ exports.SignalArgumentContainer = void 0;
 // A wrapper around signal's argument
 class SignalArgumentContainer {
     constructor() {
-        this.__metadata = {};
+        this.__client_metadata = {};
     }
 }
 exports.SignalArgumentContainer = SignalArgumentContainer;

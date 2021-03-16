@@ -9,7 +9,6 @@ import { SignalArgumentContainer } from './SignalArgumentContainer';
 
 // Levels of visibility currently supported
 export enum VisibilityEnum {
-    ToNobody = -1, // This turns off state propagation
     ToOwnerOnly = 0,
     ToListOfUsers,
     ToEveryone
@@ -48,9 +47,12 @@ export class DurableEntity<TState extends object> {
         const argumentContainer = this._context.df.getInput() as SignalArgumentContainer;
 
         // If the signal was sent by our manage-entities method, then it should contain __metadata field with user name in it
-        const signalMetadata = argumentContainer.__metadata;
+        const signalMetadata = argumentContainer.__client_metadata;
         const signalArgument = (!signalMetadata) ? argumentContainer : argumentContainer.argument;
         this._callingUser = signalMetadata?.callingUser;
+
+        // Signals coming from client always have __client_metadata property filled. DurableEntityProxy doesn't set it.
+        const isItServerSideCall = !signalMetadata;
 
         // Loading actor's state
         this._stateContainer = this._context.df.getState(() => new DurableEntityStateContainer(
@@ -63,7 +65,7 @@ export class DurableEntity<TState extends object> {
         var metadataHasChanged = !this._stateContainer.__metadata.version;
 
         // Checking access rights
-        if (!DurableEntityStateContainer.isAccessAllowed(this._stateContainer, this._callingUser)) {
+        if (!isItServerSideCall && (!DurableEntityStateContainer.isAccessAllowed(this._stateContainer, this._callingUser))) {
             throw new Error(`Access to @${this._context.df.entityName}@${this._context.df.entityKey} not allowed`);
         }
 
@@ -89,7 +91,7 @@ export class DurableEntity<TState extends object> {
         } else if (typeof this[operationName] === 'function') { // if there is a method with that name in child class
 
             // Executing the handler
-            var result = this[operationName](argumentContainer.argument);
+            var result = this[operationName](signalArgument);
 
             // Checking if it is a promise that needs to be awaited
             if (DurableEntity.isPromise(result)) {
@@ -132,10 +134,6 @@ export class DurableEntity<TState extends object> {
 
     private sendUpdatedStateViaSignalR(stateContainer: DurableEntityStateContainer<TState>, stateDiff: rfc6902.Operation[], isDestructed: boolean ) {
 
-        if (stateContainer.__metadata.visibility === VisibilityEnum.ToNobody) {
-            return;
-        }
-
         const notification: EntityStateChangedMessage = {
             entityName: this._context.df.entityName,
             entityKey: this._context.df.entityKey,
@@ -150,11 +148,14 @@ export class DurableEntity<TState extends object> {
             case VisibilityEnum.ToOwnerOnly:
 
                 // Sending to owner only
-                this._context.bindings.signalRMessages.push({
-                    userId: stateContainer.__metadata.owner,
-                    target: SignalRClientHandlerName,
-                    arguments: [notification]
-                });
+                if (!!stateContainer.__metadata.owner) {
+                    
+                    this._context.bindings.signalRMessages.push({
+                        userId: stateContainer.__metadata.owner,
+                        target: SignalRClientHandlerName,
+                        arguments: [notification]
+                    });
+                }
                 
                 break;
             case VisibilityEnum.ToListOfUsers:

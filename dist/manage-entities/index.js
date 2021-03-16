@@ -22,7 +22,7 @@ function default_1(context, req) {
         const callingUser = req.headers[Constants_1.ClientPrincipalHeaderName];
         const durableClient = DurableFunctions.getClient(context);
         if (req.method === "POST") {
-            yield durableClient.signalEntity(new DurableFunctions.EntityId(entityName, entityKey), signalName, { argument: req.body, __metadata: { callingUser } });
+            yield durableClient.signalEntity(new DurableFunctions.EntityId(entityName, entityKey), signalName, { argument: req.body, __client_metadata: { callingUser } });
         }
         else if (!entityKey) {
             const entityNameString = `@${entityName}@`;
