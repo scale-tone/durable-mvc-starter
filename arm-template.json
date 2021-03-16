@@ -53,20 +53,21 @@
                 }
             }
         },
-
-
-
         {
             "type": "Microsoft.Web/serverfarms",
             "apiVersion": "2016-09-01",
             "name": "[variables('hostingPlanName')]",
             "location": "[resourceGroup().location]",
             "properties": {
-                "name": "[variables('hostingPlanName')]"
+                "name": "[variables('hostingPlanName')]",
+                "workerSize": "4",
+                "workerSizeId": "4",
+                "numberOfWorkers": "1",
+                "reserved": false
             },
             "sku": {
-                "name": "EP2",
-                "Tier": "ElasticPremium"
+                "Tier": "PremiumV2",
+                "Name": "P2v2"
             }
         },
         {
