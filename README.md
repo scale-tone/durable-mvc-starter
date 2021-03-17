@@ -45,6 +45,8 @@ More examples you can find in [this separate repo](https://github.com/scale-tone
 
 In a matter of seconds a new instance of [CounterEntity](https://github.com/scale-tone/durable-mvc-starter/blob/main/CounterEntity/index.ts) will be created and rendered in your browser. Try to open that page in multiple browser tabs and observe the state being automatically synchronized across them. Also try to kill/restart the Functions host process (func.exe) and observe the state being preserved.
 
+Once created, you can also monitor your Durable Entities with [Durable Functions Monitor](https://github.com/scale-tone/DurableFunctionsMonitor).
+
 # How to deploy to Azure
 
 You can deploy the contents of this same repo with this
