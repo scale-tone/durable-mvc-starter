@@ -19,7 +19,7 @@ export default async function (context: Context, req: HttpRequest): Promise<void
     if (req.method === "POST") {
         
         // Producing a simple random correlationId
-        const correlationId = `@${entityName}@${entityKey}@${signalName}` + Math.random().toString(36).slice(2) + (new Date()).getTime().toString(36);
+        const correlationId = `@${entityName}@${entityKey}@${signalName}@` + Math.random().toString(36).slice(2) + (new Date()).getTime().toString(36);
 
         await durableClient.signalEntity(new DurableFunctions.EntityId(entityName, entityKey),
             signalName,

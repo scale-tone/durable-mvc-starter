@@ -23,7 +23,7 @@ function default_1(context, req) {
         const durableClient = DurableFunctions.getClient(context);
         if (req.method === "POST") {
             // Producing a simple random correlationId
-            const correlationId = `@${entityName}@${entityKey}@${signalName}` + Math.random().toString(36).slice(2) + (new Date()).getTime().toString(36);
+            const correlationId = `@${entityName}@${entityKey}@${signalName}@` + Math.random().toString(36).slice(2) + (new Date()).getTime().toString(36);
             yield durableClient.signalEntity(new DurableFunctions.EntityId(entityName, entityKey), signalName, { argument: req.body, __client_metadata: { callingUser, correlationId } });
             // Returning correlationId back to client, so that it can subscribe to results
             context.res = { body: { correlationId } };
