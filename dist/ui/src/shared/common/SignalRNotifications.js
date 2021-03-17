@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EntityStateChangedMessage = void 0;
+exports.EntitySignalResponseMessage = exports.EntityStateChangedMessage = void 0;
 class EntityStateChangedMessage {
     constructor() {
         this.entityName = '';
@@ -17,4 +17,13 @@ class EntityStateChangedMessage {
     }
 }
 exports.EntityStateChangedMessage = EntityStateChangedMessage;
+class EntitySignalResponseMessage {
+    constructor() {
+        this.entityName = '';
+        this.entityKey = '';
+        this.correlationId = '';
+        this.errorMessage = '';
+    }
+}
+exports.EntitySignalResponseMessage = EntitySignalResponseMessage;
 //# sourceMappingURL=SignalRNotifications.js.map

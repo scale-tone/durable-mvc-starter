@@ -16,3 +16,12 @@ export class EntityStateChangedMessage {
         return `@${entityName}@${entityKey}`;
     }
 }
+
+export class EntitySignalResponseMessage {
+
+    entityName: string = '';
+    entityKey: string = '';
+    correlationId: string = '';
+    result: any;
+    errorMessage: string = '';
+}

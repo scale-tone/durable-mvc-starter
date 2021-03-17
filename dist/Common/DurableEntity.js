@@ -43,6 +43,7 @@ class DurableEntity {
         return VisibilityEnum.ToOwnerOnly;
     }
     handleSignal() {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             const argumentContainer = this._context.df.getInput();
             // If the signal was sent by our manage-entities method, then it should contain __metadata field with user name in it
@@ -75,14 +76,22 @@ class DurableEntity {
                 metadataHasChanged = true;
             }
             else if (typeof this[operationName] === 'function') { // if there is a method with that name in child class
-                // Executing the handler
-                var result = this[operationName](signalArgument);
-                // Checking if it is a promise that needs to be awaited
-                if (DurableEntity.isPromise(result)) {
-                    result = yield result;
+                try {
+                    // Executing the handler
+                    var result = this[operationName](signalArgument);
+                    // Checking if it is a promise that needs to be awaited
+                    if (DurableEntity.isPromise(result)) {
+                        result = yield result;
+                    }
+                    // Setting return value, if any
+                    this._context.df.return(result);
+                    // Sending return value to the calling user, if any
+                    this.sendSignalResponseViaSignalR(this._callingUser, signalMetadata === null || signalMetadata === void 0 ? void 0 : signalMetadata.correlationId, result, undefined);
                 }
-                // Setting return value, if any
-                this._context.df.return(result);
+                catch (err) {
+                    this.sendSignalResponseViaSignalR(this._callingUser, signalMetadata === null || signalMetadata === void 0 ? void 0 : signalMetadata.correlationId, undefined, (_a = err.message) !== null && _a !== void 0 ? _a : `${operationName} failed`);
+                    throw err;
+                }
             }
             // Checking if the state has changed
             const stateDiff = rfc6902.createPatch(oldState, this._stateContainer.state);
@@ -112,7 +121,9 @@ class DurableEntity {
             version: stateContainer.__metadata.version,
             isEntityDestructed: isDestructed
         };
-        this._context.bindings.signalRMessages = [];
+        if (!this._context.bindings.signalRMessages) {
+            this._context.bindings.signalRMessages = [];
+        }
         switch (stateContainer.__metadata.visibility) {
             case VisibilityEnum.ToOwnerOnly:
                 // Sending to owner only
@@ -142,6 +153,26 @@ class DurableEntity {
                 });
                 break;
         }
+    }
+    sendSignalResponseViaSignalR(callingUser, correlationId, result, errorMessage) {
+        if (!callingUser || !correlationId) {
+            return;
+        }
+        const notification = {
+            entityName: this._context.df.entityName,
+            entityKey: this._context.df.entityKey,
+            correlationId,
+            result,
+            errorMessage
+        };
+        if (!this._context.bindings.signalRMessages) {
+            this._context.bindings.signalRMessages = [];
+        }
+        this._context.bindings.signalRMessages.push({
+            userId: callingUser,
+            target: Constants_1.SignalRSignalResponseHandlerName,
+            arguments: [notification]
+        });
     }
     static isPromise(returnValue) {
         return (!!returnValue) && typeof returnValue.then === 'function';

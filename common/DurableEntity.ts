@@ -1,9 +1,9 @@
 import * as rfc6902 from 'rfc6902';
 import { IEntityFunctionContext } from 'durable-functions/lib/src/classes';
 
-import { EntityStateChangedMessage } from '../ui/src/shared/common/SignalRNotifications';
+import { EntityStateChangedMessage, EntitySignalResponseMessage } from '../ui/src/shared/common/SignalRNotifications';
 import { ISetEntityMetadataRequest } from '../ui/src/shared/common/ISetEntityMetadataRequest';
-import { SignalRClientHandlerName, UpdateMetadataServiceMethodName } from '../ui/src/shared/common/Constants';
+import { SignalRClientHandlerName, SignalRSignalResponseHandlerName, UpdateMetadataServiceMethodName } from '../ui/src/shared/common/Constants';
 import { DurableEntityStateContainer, DurableEntityStateMetadata } from './DurableEntityStateContainer';
 import { SignalArgumentContainer } from './SignalArgumentContainer';
 
@@ -90,16 +90,26 @@ export class DurableEntity<TState extends object> {
             
         } else if (typeof this[operationName] === 'function') { // if there is a method with that name in child class
 
-            // Executing the handler
-            var result = this[operationName](signalArgument);
+            try {
 
-            // Checking if it is a promise that needs to be awaited
-            if (DurableEntity.isPromise(result)) {
-                result = await result;
+                // Executing the handler
+                var result = this[operationName](signalArgument);
+
+                // Checking if it is a promise that needs to be awaited
+                if (DurableEntity.isPromise(result)) {
+                    result = await result;
+                }
+
+                // Setting return value, if any
+                this._context.df.return(result);
+
+                // Sending return value to the calling user, if any
+                this.sendSignalResponseViaSignalR(this._callingUser, signalMetadata?.correlationId, result, undefined);
+
+            } catch (err) {
+                this.sendSignalResponseViaSignalR(this._callingUser, signalMetadata?.correlationId, undefined, err.message ?? `${operationName} failed`);
+                throw err;
             }
-
-            // Setting return value, if any
-            this._context.df.return(result);
         }
 
         // Checking if the state has changed
@@ -142,7 +152,9 @@ export class DurableEntity<TState extends object> {
             isEntityDestructed: isDestructed
         };
 
-        this._context.bindings.signalRMessages = [];
+        if (!this._context.bindings.signalRMessages) {
+            this._context.bindings.signalRMessages = [];
+        }
 
         switch (stateContainer.__metadata.visibility) {
             case VisibilityEnum.ToOwnerOnly:
@@ -181,6 +193,31 @@ export class DurableEntity<TState extends object> {
 
                 break;
         }
+    }
+
+    private sendSignalResponseViaSignalR(callingUser: string, correlationId: string, result: any, errorMessage: string) {
+
+        if (!callingUser || !correlationId) {
+            return;
+        }
+
+        const notification: EntitySignalResponseMessage = {
+            entityName: this._context.df.entityName,
+            entityKey: this._context.df.entityKey,
+            correlationId,
+            result,
+            errorMessage
+        };
+
+        if (!this._context.bindings.signalRMessages) {
+            this._context.bindings.signalRMessages = [];
+        }
+
+        this._context.bindings.signalRMessages.push({
+            userId: callingUser,
+            target: SignalRSignalResponseHandlerName,
+            arguments: [notification]
+        });
     }
 
     private static isPromise(returnValue: any): boolean {

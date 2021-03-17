@@ -3,8 +3,8 @@ import { HubConnectionBuilder, HubConnection, NullLogger, LogLevel } from '@aspn
 import * as rfc6902 from 'rfc6902';
 
 import { ISetEntityMetadataRequest } from '../shared/common/ISetEntityMetadataRequest';
-import { EntityStateChangedMessage } from '../shared/common/SignalRNotifications';
-import { SignalRClientHandlerName, UpdateMetadataServiceMethodName } from '../shared/common/Constants';
+import { EntityStateChangedMessage, EntitySignalResponseMessage } from '../shared/common/SignalRNotifications';
+import { SignalRClientHandlerName, SignalRSignalResponseHandlerName, UpdateMetadataServiceMethodName } from '../shared/common/Constants';
 import { DurableEntityClientStateContainer } from '../shared/common/DurableEntityClientStateContainer';
 import { IDurableEntitySetConfig } from './IDurableEntitySetConfig';
 import { DurableHttpClient, BackendBaseUri } from './DurableHttpClient';
@@ -69,6 +69,12 @@ export class DurableEntitySet<TState extends object> {
         return DurableEntitySet.signalEntity(this._entityName, entityKey, signalName, argument);
     }
 
+    // Sends a signal to the given entity and returns a promise with results
+    callEntity(entityKey: string, signalName: string, argument?: any): Promise<any> {
+
+        return DurableEntitySet.callEntity(this._entityName, entityKey, signalName, argument);
+    }
+
     // Updates metadata of the given entity
     updateEntityMetadata(entityKey: string, metadata: ISetEntityMetadataRequest): Promise<void> {
 
@@ -118,6 +124,25 @@ export class DurableEntitySet<TState extends object> {
         return this.HttpClient.post(uri, { content: JSON.stringify(argument) }).then();
     }
 
+    // Sends a signal to the given entity and returns a promise with results
+    static callEntity(entityName: string, entityKey: string, signalName: string, argument?: any): Promise<any> {
+
+        // Inside Durable Functions entity names are always lower-case, so we need to convert
+        entityName = entityName.toLowerCase();
+
+        const uri = `${BackendBaseUri}/entities/${entityName}/${entityKey}/${signalName}`;
+
+        return new Promise<any>((resolve, reject) => {
+
+            this.HttpClient.post(uri, { content: JSON.stringify(argument) }).then(response => {
+
+                const correlationId: string = JSON.parse(response.content as string).correlationId;
+                this.SignalResultPromises[correlationId] = { resolve, reject };
+
+            }, reject);
+        });
+    }
+
     // Updates metadata of the given entity
     static updateEntityMetadata(entityName: string, entityKey: string, metadata: ISetEntityMetadataRequest): Promise<void> {
 
@@ -137,6 +162,8 @@ export class DurableEntitySet<TState extends object> {
 
     private static EntitySets: { [entityName: string]: EntityStateWithKey[] } = {};
     private static EntityStates: { [entityId: string]: DurableEntityClientStateContainer } = {};
+    private static SignalResultPromises: { [correlationId: string]: { resolve: (res: any) => void, reject: (err: Error) => void } } = {};
+
     private static SignalRConn: HubConnection;
 
     private static readonly SignalRReconnectIntervalInMs = 5000;
@@ -295,6 +322,22 @@ export class DurableEntitySet<TState extends object> {
         }
     }
 
+    private static entitySignalResponseHandler(msg: EntitySignalResponseMessage): void {
+
+        const responsePromise = this.SignalResultPromises[msg.correlationId];
+        if (!responsePromise) {
+            return;
+        }
+
+        if (!msg.errorMessage) {
+            responsePromise.resolve(msg.result);
+        } else {
+            responsePromise.reject(new Error(msg.errorMessage));
+        }
+
+        delete this.SignalResultPromises[msg.correlationId];
+    }
+
     private static initSignalR(): void {
 
         if (!!this.SignalRConn) {
@@ -306,8 +349,9 @@ export class DurableEntitySet<TState extends object> {
             .withUrl(`${BackendBaseUri}`, { httpClient: this.HttpClient, logger: this.Config.logger })
             .build();
 
-        // Mounting the event handler
+        // Mounting event handlers
         this.SignalRConn.on(SignalRClientHandlerName, msg => this.entityStateChangedMessageHandler(msg));
+        this.SignalRConn.on(SignalRSignalResponseHandlerName, msg => this.entitySignalResponseHandler(msg));
 
         // Background reconnects are essential here. That's because in 'Default' or 'Classic' service mode
         // clients get forcibly disconnected, when your backend restarts.
