@@ -55,3 +55,33 @@ You can deploy the contents of this same repo with this
 
 Once you cloned this repo and added some code to your copy, you then deploy it [in the same way as you would normally deploy an Azure Functions Node.js project](https://docs.microsoft.com/en-us/azure/azure-functions/functions-reference-node?tabs=v2#deploying-with-dependencies).
 
+# How to define your entities
+
+The folder structure is no different from [what you would normally make for your normal JavaScript-based Durable Entities](https://docs.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-entities?tabs=javascript#define-entities). In the project's root folder (adjacent to host.json) create a new folder, name it after your entity (e.g. `MyEntity`) and put two files into it:
+* **index.ts**, where you put the code of your entity. It should be a class derived from [DurableEntity\<TState\>](https://github.com/scale-tone/durable-mvc-starter/blob/main/common/DurableEntity.ts). Methods of your class, that are intended to be signal handlers, are expected to take **zero or one** parameter. The state is available to your code via `this.state` property, and it will be loaded/saved automatically. The default visibility level for an entity is `VisibilityEnum.ToOwnerOnly` (which means that only the creator will be able to access it from the client and change notifications will only be sent to the creator), to change it override the [DurableEntity.visibility](https://github.com/scale-tone/durable-mvc-starter/blob/main/common/DurableEntity.ts#L41) property. To do a custom state initialization for a newly created entity instance override the [DurableEntity.initializeState()](https://github.com/scale-tone/durable-mvc-starter/blob/main/common/DurableEntity.ts#L36) method. IMPORTANT: last line of your **index.ts** file needs to be a required boilerplate like this:
+    ```
+    export default DurableFunctions.entity((ctx) => new MyEntity(ctx).handleSignal());
+    ```
+    
+* **function.json**, where triggers and bindings are defined. The trigger should be **entityTrigger**, and there should at least be a binding of type **signalR** and name **signalRMessages** specified there (otherwise SignalR notifications won't be sent). Here is an example:
+    ```
+    {
+        "bindings": [
+            {
+                "name": "context",
+                "type": "entityTrigger",
+                "direction": "in"
+            },
+            {
+                "type": "signalR",
+                "name": "signalRMessages",
+                "hubName": "%AzureSignalRHubName%",
+                "connectionStringSetting": "AzureSignalRConnectionString",
+                "direction": "out"
+            }
+        ],
+        "disabled": false,
+        "scriptFile": "../dist/MyEntity/index.js"
+    }    
+    ```
+  
