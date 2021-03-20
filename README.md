@@ -87,3 +87,7 @@ The folder structure is no different from [what you would normally make for your
     }    
     ```
   
+# How to bind to your entities on the client
+
+[DurableEntitySet](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts) provides static methods, that return a single observable state object. Those methods are [createEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L109) (creates an entity with given key, if not created yet) and [attachEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L85) (doesn't create anything, just tries to attach).
+To get an observable collection of entities of a given type create an instance of [DurableEntitySet\<TState\>](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts) class and then bind to its [items](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L18) property.
