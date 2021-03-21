@@ -95,4 +95,6 @@ The folder structure is no different from [what you would normally make for your
 
 To get an [observable collection](https://mobx.js.org/observable-state.html) of entities of a certain type create an instance of [DurableEntitySet\<TState\>](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts) class and then bind to its [items](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L18) property. Newly added entities will automatically appear there and removed (destroyed) entities will automatically be dropped.
 
-To send signals to your entities use [DurableEntitySet.signalEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L118) (sends a signal in a fire-and-forget manner) or [DurableEntitySet.callEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L128) (returns a Promise, that will be resolved once a signal actually gets processed by your entity) methods.
+To send signals to your entities use: 
+* [DurableEntitySet.signalEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L118) - sends a signal in a fire-and-forget manner. 
+* [DurableEntitySet.callEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L128) - 'calls' an entity aka returns a Promise, that will be resolved once the sent signal actually gets processed.
