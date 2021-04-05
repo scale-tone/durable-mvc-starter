@@ -46,8 +46,8 @@ export class DurableEntity<TState extends object> {
 
         const argumentContainer = this._context.df.getInput() as SignalArgumentContainer;
 
-        // If the signal was sent by our manage-entities method, then it should contain __metadata field with user name in it
-        const signalMetadata = argumentContainer.__client_metadata;
+        // If the signal was sent by our manage-entities method, then it should contain __client_metadata field with user name in it
+        const signalMetadata = !argumentContainer ? null : argumentContainer.__client_metadata;
         const signalArgument = (!signalMetadata) ? argumentContainer : argumentContainer.argument;
         this._callingUser = signalMetadata?.callingUser;
 

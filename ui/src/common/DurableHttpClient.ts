@@ -16,12 +16,7 @@ export class DurableHttpClient extends DefaultHttpClient {
 
         // Applying custom config settings, but only when calling our backend
 
-        var path = request.url!;
-        if (path.startsWith('http')) {
-            path = '/' + path.split('/').slice(3).join('/');
-        }
-
-        if (path.includes(BackendBaseUri)) {
+        if (request.url!.includes(BackendBaseUri)) {
 
             const config = this._configFabric();
 

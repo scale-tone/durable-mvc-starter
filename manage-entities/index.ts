@@ -1,5 +1,5 @@
-import { Context, HttpRequest } from "@azure/functions"
-import * as DurableFunctions from 'durable-functions'
+import { Context, HttpRequest } from '@azure/functions';
+import * as DurableFunctions from 'durable-functions';
 
 import { SignalArgumentContainer } from '../common/SignalArgumentContainer';
 import { DurableEntityStateContainer } from '../common/DurableEntityStateContainer';

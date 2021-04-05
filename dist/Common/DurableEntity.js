@@ -46,8 +46,8 @@ class DurableEntity {
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
             const argumentContainer = this._context.df.getInput();
-            // If the signal was sent by our manage-entities method, then it should contain __metadata field with user name in it
-            const signalMetadata = argumentContainer.__client_metadata;
+            // If the signal was sent by our manage-entities method, then it should contain __client_metadata field with user name in it
+            const signalMetadata = !argumentContainer ? null : argumentContainer.__client_metadata;
             const signalArgument = (!signalMetadata) ? argumentContainer : argumentContainer.argument;
             this._callingUser = signalMetadata === null || signalMetadata === void 0 ? void 0 : signalMetadata.callingUser;
             // Signals coming from client always have __client_metadata property filled. DurableEntityProxy doesn't set it.
