@@ -16,11 +16,8 @@ IF %errorlevel% NEQ 0 goto end
 
 cd %MY_BUILD_TEMP_FOLDER%
 
-:: Installing yarn, as it installs npm packages much faster
-call npm install yarn --silent
-
 :: Installing npm packages
-call node_modules\.bin\yarn
+call npm install --production
 IF %errorlevel% NEQ 0 goto end
 
 :: Zipping the entire temp folder into d:\home\data\SitePackages\package.zip, 

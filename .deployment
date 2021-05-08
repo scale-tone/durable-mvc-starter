@@ -1,2 +1,2 @@
 [config]
-command = deploy-with-yarn-and-run-from-package.cmd
+command = deploy-with-run-from-package.cmd
