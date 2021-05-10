@@ -118,3 +118,48 @@ test('creates an entity by initializing its metadata', async () => {
     // Also checking that SignalR connection was initialized
     expect((DurableEntitySet as any).SignalRConn.connection.httpClient).toBe(fakeHttpClient);
 });
+
+test('reconnects to SignalR', async () => {
+
+    // arrange
+
+    (DurableEntitySet as any).SignalRConn = undefined;
+
+    const postUrls = [], getUrls = [];
+
+    const fakeHttpClient = {
+
+        send: (url) => {
+            throw new Error('Should not be used');
+        },
+
+        post: (url) => {
+            postUrls.push(url);
+            return Promise.resolve();
+        },
+
+        get: (url) => {
+            getUrls.push(url);
+            return Promise.resolve([]);
+        }
+    };
+
+    (DurableEntitySet as any).HttpClient = fakeHttpClient;
+
+    // act
+
+    new DurableEntitySet('myentity', true);
+
+    // Assert
+
+    const signalRConn = (DurableEntitySet as any).SignalRConn;
+    const onCloseCallback = signalRConn.closedCallbacks[0];
+
+    expect(onCloseCallback.toString()).toBe('() => this.reconnectToSignalR()');
+
+    expect(postUrls.length).toBe(1);
+    expect(postUrls[0]).toBe('http://localhost:7071/a/p/i/negotiate');
+
+    expect(getUrls.length).toBe(1);
+    expect(getUrls[0]).toBe('http://localhost:7071/a/p/i/entities/myentity');
+});
