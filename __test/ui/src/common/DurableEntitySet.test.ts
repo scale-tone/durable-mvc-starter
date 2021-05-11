@@ -63,7 +63,6 @@ test('creates an entity by initializing its metadata', async () => {
     const initialFieldValue = 'value1';
     const fetchedFieldValue = 'value2';
 
-
     (DurableEntitySet as any).SignalRConn = undefined;
 
     const postUrls = [], getUrls = [];
@@ -184,8 +183,6 @@ test('applies entity state change', async () => {
 
     // arrange
 
-    (DurableEntitySet as any).SignalRConn = undefined;
-
     const postUrls = [], getUrls = [];
 
     const entityName = 'myentity3';
@@ -195,10 +192,6 @@ test('applies entity state change', async () => {
     var fetchedVersion = 1;
 
     const fakeHttpClient = {
-
-        send: (url) => {
-            throw new Error('Should not be used');
-        },
 
         post: (url) => {
             postUrls.push(url);
@@ -260,12 +253,9 @@ test('applies entity state change', async () => {
     expect(fieldValue2).toBe(fetchedFieldValue);
 });
 
-
 test('drops destroyed entity from entity collection', async () => {
 
     // arrange
-
-    (DurableEntitySet as any).SignalRConn = undefined;
 
     const postUrls = [], getUrls = [];
 
@@ -273,10 +263,6 @@ test('drops destroyed entity from entity collection', async () => {
     const entityKey = 'mykey4';
 
     const fakeHttpClient = {
-
-        send: (url) => {
-            throw new Error('Should not be used');
-        },
 
         post: (url) => {
             postUrls.push(url);
@@ -322,15 +308,9 @@ test('retries fetching the state from server', async () => {
 
     // arrange
 
-    (DurableEntitySet as any).SignalRConn = undefined;
-
     const getUrls = [];
 
     const fakeHttpClient = {
-
-        send: (url) => {
-            throw new Error('Should not be used');
-        },
 
         get: (url) => {
             getUrls.push(url);
@@ -356,4 +336,58 @@ test('retries fetching the state from server', async () => {
     for (var i = 1; i < 7; i++){
         expect(getUrls[i]).toBe(getUrls[i-1]);
     }
+});
+
+test('calls an entity', async () => {
+
+    // arrange
+
+    const entityName = 'myentity6';
+    const entityKey = 'mykey6';
+    const correlationId = 'mycorrelationid1';
+    const signalName = 'mysignal2';
+    const argument = 'myargument3';
+    const returnValue = 'myresult4';
+
+    const postUrls = [];
+    var sentArgument;
+
+    const fakeHttpClient = {
+
+        post: (url, body) => {
+
+            postUrls.push(url);
+            sentArgument = body.content;
+
+            return Promise.resolve({
+                content: JSON.stringify({
+                    correlationId
+                })
+            });
+        }
+    };
+
+    (DurableEntitySet as any).HttpClient = fakeHttpClient;
+
+    const signalResponseMessage = {
+        entityName,
+        entityKey,
+        correlationId,
+        result: returnValue
+    };
+
+    // act
+
+    const callPromise = DurableEntitySet.callEntity(entityName, entityKey, signalName, argument);
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    (DurableEntitySet as any).entitySignalResponseHandler(signalResponseMessage);
+    const returnedValue = await callPromise;
+
+    // Assert
+
+    expect(sentArgument).toBe(`"${argument}"`);
+    expect(returnedValue).toBe(returnValue);
+    expect(postUrls.length).toBe(1);
+    expect(postUrls[0]).toBe(`http://localhost:7071/a/p/i/entities/${entityName}/${entityKey}/${signalName}`);
 });
