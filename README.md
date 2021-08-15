@@ -4,8 +4,7 @@ Basic project setup and scaffolding for creating serverless web applications bas
 
 The gist of this architectural approach is to define a strongly-typed state (a TypeScript class with no methods, like [this one](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/shared/CounterState.ts)), then implement your server-side state transformation logic in form of a Durable Entity (like [this one](https://github.com/scale-tone/durable-mvc-starter/blob/main/DurableEntities/CounterEntity.ts)) and then render your state on the client with some [JSX](https://www.typescriptlang.org/docs/handbook/jsx.html) (like [this one](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/App.tsx)). Once the state changes on the server, its changes are incrementally propagated to the client via [SignalR](https://docs.microsoft.com/en-us/azure/azure-signalr/signalr-overview) and automatically re-rendered thanks to [MobX](https://mobx.js.org).
 
-![image](https://user-images.githubusercontent.com/5447190/129478058-290f9e9c-bc52-4915-b423-c78cfdb56c70.png)
-
+<img src="https://user-images.githubusercontent.com/5447190/129478058-290f9e9c-bc52-4915-b423-c78cfdb56c70.png" height="400px"/>
 
 Why is it called 'Durable MVC'? Because it looks like MVC ([Model-View-Controller](https://en.wikipedia.org/wiki/Model%E2%80%93view%E2%80%93controller)), but instead of controllers the logic is implemented in form of [Durable Entities](https://docs.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-entities?tabs=javascript).
 
