@@ -29,7 +29,7 @@ export class DurableEntity<TState extends object> {
     // To be called by entity, when it decides to kill itself
     protected destructOnExit(): void { this._destructOnExit = true; }
 
-    constructor(protected _context: IEntityFunctionContext) {
+    constructor(protected _context: IEntityFunctionContext<DurableEntityStateContainer<TState>>) {
     }
 
     // Override this to provide the state for a newly created entity
@@ -44,7 +44,7 @@ export class DurableEntity<TState extends object> {
 
     async handleSignal() {
 
-        const argumentContainer = this._context.df.getInput() as SignalArgumentContainer;
+        const argumentContainer = this._context.df.getInput<SignalArgumentContainer>();
 
         // If the signal was sent by our manage-entities method, then it should contain __client_metadata field with user name in it
         const signalMetadata = !argumentContainer ? null : argumentContainer.__client_metadata;
@@ -59,7 +59,7 @@ export class DurableEntity<TState extends object> {
             this.initializeState(),
             this.visibility,
             this._callingUser
-        )) as DurableEntityStateContainer<TState>;
+        ));
 
         // Always notifying about newly created entities
         var metadataHasChanged = !this._stateContainer.__metadata.version;

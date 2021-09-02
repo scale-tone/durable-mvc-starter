@@ -10,7 +10,7 @@
     "test": "jest --verbose"
   },
   "dependencies": {
-    "durable-functions": "^1.4.6",
+    "durable-functions": "^1.5.2",
     "rfc6902": "^4.0.1"
   },
   "devDependencies": {

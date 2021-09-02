@@ -93,3 +93,6 @@ bin
 obj
 appsettings.json
 local.settings.json
+
+# Visual Studio stuff
+.vs

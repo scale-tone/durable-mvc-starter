@@ -50,7 +50,7 @@ for (const entityName in entities) {
         const code = `
 import * as DurableFunctions from "durable-functions"
 import { ${entityName} } from '${importFileName}';
-export default DurableFunctions.entity((ctx) => new ${entityName}(ctx).handleSignal());
+export default DurableFunctions.entity((ctx) => new ${entityName}(ctx as any).handleSignal());
         `;
 
         fs.writeFileSync(indexTsFileName, code);
