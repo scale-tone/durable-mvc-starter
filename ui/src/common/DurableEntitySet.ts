@@ -361,17 +361,7 @@ export class DurableEntitySet<TState extends object> {
 
         // Background reconnects are essential here. That's because in 'Default' or 'Classic' service mode
         // clients get forcibly disconnected, when your backend restarts.
-        this.SignalRConn.onclose(() => {
-            var tryToReconnect = () => {
-                this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: reconnecting to SignalR...`);
-                this.SignalRConn.start().then(() => {
-                    this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: reconnected to SignalR`);
-                }, () => {
-                    setTimeout(tryToReconnect, this.SignalRReconnectIntervalInMs);
-                })
-            }
-            tryToReconnect();
-        });
+        this.SignalRConn.onclose(() => this.reconnectToSignalR());
 
         // Establishing SignalR connection
         this.SignalRConn.start().then(
@@ -380,5 +370,15 @@ export class DurableEntitySet<TState extends object> {
             }, err => {
                 this.Config.logger!.log(LogLevel.Error, `DurableEntitySet: failed to connect to SignalR: ${err}`);
             });
+    }
+
+    private static reconnectToSignalR() {
+
+        this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: reconnecting to SignalR...`);
+        this.SignalRConn.start().then(() => {
+            this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: reconnected to SignalR`);
+        }, () => {
+            setTimeout(() => this.reconnectToSignalR(), this.SignalRReconnectIntervalInMs);
+        });
     }
 }
