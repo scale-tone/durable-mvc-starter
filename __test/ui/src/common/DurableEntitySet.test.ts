@@ -158,9 +158,12 @@ test('reconnects to SignalR and attaches entities', async () => {
 
     const entitySet = new DurableEntitySet('myentity', true);
 
+    // Attaching all entities one more time, to make sure it doesn't cause duplicates
+    entitySet.attachAllEntities();
+
     // Assert
 
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise(resolve => setTimeout(resolve, 30));
 
     const signalRConn = (DurableEntitySet as any).SignalRConn;
     const onCloseCallback = signalRConn.closedCallbacks[0];
@@ -170,8 +173,9 @@ test('reconnects to SignalR and attaches entities', async () => {
     expect(postUrls.length).toBe(1);
     expect(postUrls[0]).toBe('http://localhost:7071/a/p/i/negotiate');
 
-    expect(getUrls.length).toBe(1);
+    expect(getUrls.length).toBe(2);
     expect(getUrls[0]).toBe('http://localhost:7071/a/p/i/entities/myentity');
+    expect(getUrls[1]).toBe('http://localhost:7071/a/p/i/entities/myentity');
 
     expect(entitySet.items.length).toBe(1);
     const entityState = entitySet.items[0];
