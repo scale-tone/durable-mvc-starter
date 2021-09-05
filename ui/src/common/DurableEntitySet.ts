@@ -17,10 +17,10 @@ export class DurableEntitySet<TState extends object> {
     // All attached entities will appear in this observable array
     items: (TState & EntityStateWithKey)[] = [];
     
-    constructor(private _entityName: string, attachToAll: boolean = true) {
+    constructor(private _entityNameLowerCase: string, attachToAll: boolean = true) {
 
         // Inside Durable Functions entity names are always lower-case, so we need to convert
-        this._entityName = this._entityName.toLowerCase();
+        this._entityNameLowerCase = this._entityNameLowerCase.toLowerCase();
 
         makeObservable(this, { items: observable });
         
@@ -36,49 +36,49 @@ export class DurableEntitySet<TState extends object> {
         DurableEntitySet.initSignalR();
 
         // Registering ourselves as listeners for this type of entity
-        DurableEntitySet.EntitySets[this._entityName] = this.items;
+        DurableEntitySet.EntitySets[this._entityNameLowerCase] = this.items;
 
         // Loading all existing entities
-        return DurableEntitySet.fetchAndApplyAllEntityStates(this._entityName);
+        return DurableEntitySet.fetchAndApplyAllEntityStates(this._entityNameLowerCase);
     }
 
     // Manually attach a single entity with specific key
     attachEntity(entityKey: string): void {
 
-        const entityId = EntityStateChangedMessage.FormatEntityId(this._entityName, entityKey);
+        const entityId = EntityStateChangedMessage.FormatEntityId(this._entityNameLowerCase, entityKey);
 
-        if (!!DurableEntitySet.EntityStates[entityId]) {
+        if (!!DurableEntitySet.getEntityState(entityId)) {
             return;
         }
 
         // Registering ourselves as listeners for this particular entity
         DurableEntitySet.EntitySets[entityId] = this.items;
         
-        DurableEntitySet.attachEntity(this._entityName, entityKey, undefined as any);
+        DurableEntitySet.attachEntity(this._entityNameLowerCase, entityKey, undefined as any);
     }
 
     // Creates (or fetches existing) an entity
     createEntity(entityKey: string): void {
 
-        DurableEntitySet.createEntity(this._entityName, entityKey, undefined as any);
+        DurableEntitySet.createEntity(this._entityNameLowerCase, entityKey, undefined as any);
     }
 
     // Sends a signal to the given entity
     signalEntity(entityKey: string, signalName: string, argument?: any): Promise<void> {
 
-        return DurableEntitySet.signalEntity(this._entityName, entityKey, signalName, argument);
+        return DurableEntitySet.signalEntity(this._entityNameLowerCase, entityKey, signalName, argument);
     }
 
     // Sends a signal to the given entity and returns a promise with results
     callEntity(entityKey: string, signalName: string, argument?: any): Promise<any> {
 
-        return DurableEntitySet.callEntity(this._entityName, entityKey, signalName, argument);
+        return DurableEntitySet.callEntity(this._entityNameLowerCase, entityKey, signalName, argument);
     }
 
     // Updates metadata of the given entity
     updateEntityMetadata(entityKey: string, metadata: ISetEntityMetadataRequest): Promise<void> {
 
-        return DurableEntitySet.updateEntityMetadata(this._entityName, entityKey, metadata);
+        return DurableEntitySet.updateEntityMetadata(this._entityNameLowerCase, entityKey, metadata);
     }
 
     // Produces a single observable state instance for an existing entity
@@ -87,12 +87,12 @@ export class DurableEntitySet<TState extends object> {
         DurableEntitySet.initSignalR();
 
         // Inside Durable Functions entity names are always lower-case, so we need to convert
-        entityName = entityName.toLowerCase();
+        const entityNameLowerCase = entityName.toLowerCase();
 
-        const entityId = EntityStateChangedMessage.FormatEntityId(entityName, entityKey);
-        if (!!this.EntityStates[entityId]) {
+        const existingEntity = this.getEntityState(EntityStateChangedMessage.FormatEntityId(entityNameLowerCase, entityKey));
+        if (!!existingEntity) {
             // If it is a known entity, then just returning it
-            return this.EntityStates[entityId].state as TState;
+            return existingEntity.state as TState;
         }
 
         if (!!initialState) {
@@ -100,7 +100,7 @@ export class DurableEntitySet<TState extends object> {
         }
 
         // Try to asynchronously retrieve the state from server
-        this.fetchAndApplyEntityState(entityName, entityKey, 0, 0, initialState);
+        this.fetchAndApplyEntityState(entityNameLowerCase, entityKey, 0, 0, initialState);
 
         return initialState;
     }
@@ -118,9 +118,9 @@ export class DurableEntitySet<TState extends object> {
     static signalEntity(entityName: string, entityKey: string, signalName: string, argument?: any): Promise<void> {
 
         // Inside Durable Functions entity names are always lower-case, so we need to convert
-        entityName = entityName.toLowerCase();
+        const entityNameLowerCase = entityName.toLowerCase();
 
-        const uri = `${BackendBaseUri}/entities/${entityName}/${entityKey}/${signalName}`;
+        const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}/${entityKey}/${signalName}`;
         return this.HttpClient.post(uri, { content: JSON.stringify(argument) }).then();
     }
 
@@ -128,9 +128,9 @@ export class DurableEntitySet<TState extends object> {
     static callEntity(entityName: string, entityKey: string, signalName: string, argument?: any): Promise<any> {
 
         // Inside Durable Functions entity names are always lower-case, so we need to convert
-        entityName = entityName.toLowerCase();
+        const entityNameLowerCase = entityName.toLowerCase();
 
-        const uri = `${BackendBaseUri}/entities/${entityName}/${entityKey}/${signalName}`;
+        const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}/${entityKey}/${signalName}`;
 
         return new Promise<any>((resolve, reject) => {
 
@@ -159,9 +159,7 @@ export class DurableEntitySet<TState extends object> {
 
     private static Config: IDurableEntitySetConfig = { logger: NullLogger.instance };
     private static HttpClient: DurableHttpClient = new DurableHttpClient(() => DurableEntitySet.Config);
-
     private static EntitySets: { [entityName: string]: EntityStateWithKey[] } = {};
-    private static EntityStates: { [entityId: string]: DurableEntityClientStateContainer } = {};
     private static SignalResultPromises: { [correlationId: string]: { resolve: (res: any) => void, reject: (err: Error) => void } } = {};
 
     private static SignalRConn: HubConnection;
@@ -169,15 +167,30 @@ export class DurableEntitySet<TState extends object> {
     private static readonly SignalRReconnectIntervalInMs = 5000;
     private static readonly MaxRetryCount = 6;
     private static readonly RetryBaseIntervalMs = 500;
+    
 
-    private static entityAdded(entityName: string, entityKey: string, entityState: EntityStateWithKey) {
+    private static EntityStates: { [entityId: string]: DurableEntityClientStateContainer } = {};
 
-        const entityId = EntityStateChangedMessage.FormatEntityId(entityName, entityKey);
+    private static getEntityState(entityId: string): DurableEntityClientStateContainer {
+        return this.EntityStates[entityId];
+    }
+
+    private static addOrUpdateEntityState(entityId: string, stateContainer: DurableEntityClientStateContainer): void {
+        this.EntityStates[entityId] = stateContainer;
+    }
+
+    private static removeEntityState(entityId: string): void {
+        delete this.EntityStates[entityId];
+    }
+
+    private static entityAdded(entityNameLowerCase: string, entityKey: string, entityState: EntityStateWithKey) {
+
+        const entityId = EntityStateChangedMessage.FormatEntityId(entityNameLowerCase, entityKey);
 
         // Searching for entitySet either for this particular entity or for this type of entity
         var entitySet = this.EntitySets[entityId];
         if (!entitySet) {
-            entitySet = this.EntitySets[entityName];
+            entitySet = this.EntitySets[entityNameLowerCase];
         } else {
             delete this.EntitySets[entityId];
         }
@@ -191,9 +204,9 @@ export class DurableEntitySet<TState extends object> {
         entitySet.push(entityState);
     }
 
-    private static entityDeleted(entityName: string, entityKey: string) {
+    private static entityDeleted(entityNameLowerCase: string, entityKey: string) {
 
-        const entitySet = this.EntitySets[entityName];
+        const entitySet = this.EntitySets[entityNameLowerCase];
         if (!entitySet) {
             return;
         }
@@ -207,13 +220,13 @@ export class DurableEntitySet<TState extends object> {
         }
     }
 
-    private static fetchAndApplyEntityState(entityName: string, entityKey: string, desiredVersion: number, retryCount: number, currentEntityState: any = null): void {
+    private static fetchAndApplyEntityState(entityNameLowerCase: string, entityKey: string, desiredVersion: number, retryCount: number, currentEntityState: any = null): void {
 
-        const uri = `${BackendBaseUri}/entities/${entityName}/${entityKey}`;
+        const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}/${entityKey}`;
         this.HttpClient.get(uri).then(response => {
 
             const stateContainer = JSON.parse(response.content as string) as DurableEntityClientStateContainer;
-            const entityId = EntityStateChangedMessage.FormatEntityId(entityName, entityKey);
+            const entityId = EntityStateChangedMessage.FormatEntityId(entityNameLowerCase, entityKey);
 
             if (!!desiredVersion && (stateContainer.version < desiredVersion)) {
                 throw new Error(`Expected ${entityId} of version ${desiredVersion}, but got version ${stateContainer.version}`);
@@ -228,19 +241,17 @@ export class DurableEntitySet<TState extends object> {
             } else {
 
                 // Otherwise applying the change to the existing object, so that UI is re-rendered
-                (stateContainer.state as any).entityKey = currentEntityState.entityKey; // Need to preserve the entityKey field, if it is set
-                const diff = rfc6902.createPatch(currentEntityState, stateContainer.state);
-                rfc6902.applyPatch(currentEntityState, diff);
+                this.applyStateChangesFrom(currentEntityState, stateContainer.state);
             }
 
-            if (!this.EntityStates[entityId]) {
+            if (!this.getEntityState(entityId)) {
                 
                 // Adding the newly-arrived state into collections, if any
-                this.entityAdded(entityName, entityKey, currentEntityState);
+                this.entityAdded(entityNameLowerCase, entityKey, currentEntityState);
             }
 
             // (Re)registering this entity
-            this.EntityStates[entityId] = { state: currentEntityState, version: stateContainer.version };
+            this.addOrUpdateEntityState(entityId, { state: currentEntityState, version: stateContainer.version });
 
         }).catch(err => {
 
@@ -250,7 +261,7 @@ export class DurableEntitySet<TState extends object> {
                 retryCount++;
                 setTimeout(() => {
 
-                    this.fetchAndApplyEntityState(entityName, entityKey, desiredVersion, retryCount, currentEntityState);
+                    this.fetchAndApplyEntityState(entityNameLowerCase, entityKey, desiredVersion, retryCount, currentEntityState);
 
                 }, retryCount * this.RetryBaseIntervalMs);
                 
@@ -261,28 +272,39 @@ export class DurableEntitySet<TState extends object> {
         });
     }
 
-    private static fetchAndApplyAllEntityStates(entityName: string): Promise<void> {
+    private static fetchAndApplyAllEntityStates(entityNameLowerCase: string): Promise<void> {
 
-        const uri = `${BackendBaseUri}/entities/${entityName}`;
+        const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}`;
         return this.HttpClient.get(uri).then(response => {
 
             for (var item of JSON.parse(response.content as string)) {
 
                 const entityKey = item.entityKey;
-                const entityId = EntityStateChangedMessage.FormatEntityId(entityName, entityKey);
+                const entityId = EntityStateChangedMessage.FormatEntityId(entityNameLowerCase, entityKey);
                 const stateContainer = item as DurableEntityClientStateContainer;
 
-                // Turned out that durableClient.getStatusAll() might return instances that were created _after_ that call was initiated
-                if (!!this.EntityStates[entityId]) {
-                    this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: ${entityId} is already known. Skipping.`);
-                    continue;
+                const existingStateContainer = this.getEntityState(entityId);
+                if (!existingStateContainer) {
+
+                    makeAutoObservable(stateContainer.state);
+                    this.addOrUpdateEntityState(entityId, stateContainer);
+
+                    // Adding the newly-arrived state into collections, if any
+                    this.entityAdded(entityNameLowerCase, entityKey, stateContainer.state as any);
+                    
+
+                } else if (existingStateContainer.version < stateContainer.version) {
+
+                    this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: ${entityId}, local version ${existingStateContainer.version}, remote version ${stateContainer.version}. State was updated.`);
+
+                    // Otherwise applying the change to the existing object, so that UI is re-rendered
+                    this.applyStateChangesFrom(existingStateContainer.state, stateContainer.state);
+                    existingStateContainer.version = stateContainer.version;
+
+                } else {
+
+                    this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: ${entityId} is already known and is up to date. Skipping.`);
                 }
-
-                makeAutoObservable(stateContainer.state);
-                this.EntityStates[entityId] = stateContainer;
-
-                // Adding the newly-arrived state into collections, if any
-                this.entityAdded(entityName, entityKey, stateContainer.state as any);
             }
 
         }).catch(err => {
@@ -296,13 +318,14 @@ export class DurableEntitySet<TState extends object> {
 
         this.Config.logger!.log(LogLevel.Trace, `DurableEntitySet: ${entityId} changed to version ${msg.version}`);
 
+        const existingStateContainer = this.getEntityState(entityId);
         if (msg.isEntityDestructed) {
 
-            delete this.EntityStates[entityId];
+            this.removeEntityState(entityId);
 
             this.entityDeleted(msg.entityName, msg.entityKey);
 
-        } else if (!this.EntityStates[entityId]) {
+        } else if (!existingStateContainer) {
 
             // If anybody is attached to this entity or this type of entity
             if (!!this.EntitySets[entityId] || !!this.EntitySets[msg.entityName]) {
@@ -313,17 +336,17 @@ export class DurableEntitySet<TState extends object> {
            
         } else {
 
-            const expectedVersion = this.EntityStates[entityId].version + 1;
+            const expectedVersion = existingStateContainer.version + 1;
             if (msg.version > expectedVersion) {
                 
                 // Missed some updates, so now need to reload the state from server
-                this.fetchAndApplyEntityState(msg.entityName, msg.entityKey, msg.version, 0, this.EntityStates[entityId].state);
+                this.fetchAndApplyEntityState(msg.entityName, msg.entityKey, msg.version, 0, existingStateContainer.state);
 
             } else if (msg.version === expectedVersion) {
 
                 // Applying the change
-                rfc6902.applyPatch(this.EntityStates[entityId].state, msg.stateDiff);
-                this.EntityStates[entityId].version = msg.version;
+                rfc6902.applyPatch(existingStateContainer.state, msg.stateDiff);
+                existingStateContainer.version = msg.version;
             }            
         }
     }
@@ -380,5 +403,15 @@ export class DurableEntitySet<TState extends object> {
         }, () => {
             setTimeout(() => this.reconnectToSignalR(), this.SignalRReconnectIntervalInMs);
         });
+    }
+
+    // Applies incoming changes to an existing observable object so, that UI is re-rendered
+    private static applyStateChangesFrom(currentEntityState: any, incomingEntityState: any): void {
+
+        // Need to preserve the entityKey field, if it is set
+        incomingEntityState.entityKey = currentEntityState.entityKey;
+
+        const diff = rfc6902.createPatch(currentEntityState, incomingEntityState);
+        rfc6902.applyPatch(currentEntityState, diff);
     }
 }

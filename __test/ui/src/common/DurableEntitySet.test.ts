@@ -39,7 +39,7 @@ test('attaches an entity and fetches its state from server', async () => {
 
     // act
 
-    const observableState = DurableEntitySet.attachEntity('myentity1', 'mykey1', { someField: initialFieldValue });
+    const observableState = DurableEntitySet.attachEntity('MyEntity1', 'mykey1', { someField: initialFieldValue });
 
     // Assert
 
@@ -95,7 +95,7 @@ test('creates an entity by initializing its metadata', async () => {
 
     // act
 
-    const observableState = DurableEntitySet.createEntity('myentity2', 'mykey2', { someField: initialFieldValue });
+    const observableState = DurableEntitySet.createEntity('MyEntity2', 'mykey2', { someField: initialFieldValue });
 
     // Assert
 
@@ -127,6 +127,8 @@ test('reconnects to SignalR and attaches entities', async () => {
     const entityKey = 'mykey';
     const fetchedFieldValue = 'some value';
 
+    var count = 0;
+
     const fakeHttpClient = {
 
         send: (url) => {
@@ -142,10 +144,10 @@ test('reconnects to SignalR and attaches entities', async () => {
             getUrls.push(url);
             return Promise.resolve({
                 content: JSON.stringify([{
-                    version: 1,
+                    version: count === 1 ? 2 : 1,
                     entityKey,
                     state: {
-                        someField: fetchedFieldValue
+                        someField: fetchedFieldValue + (count++)
                     }
                 }])
             });
@@ -156,9 +158,10 @@ test('reconnects to SignalR and attaches entities', async () => {
 
     // act
 
-    const entitySet = new DurableEntitySet('myentity', true);
+    const entitySet = new DurableEntitySet('MyEntity', true);
 
-    // Attaching all entities one more time, to make sure it doesn't cause duplicates
+    // Attaching all entities two more times, to make sure it doesn't cause duplicates
+    entitySet.attachAllEntities();
     entitySet.attachAllEntities();
 
     // Assert
@@ -173,14 +176,13 @@ test('reconnects to SignalR and attaches entities', async () => {
     expect(postUrls.length).toBe(1);
     expect(postUrls[0]).toBe('http://localhost:7071/a/p/i/negotiate');
 
-    expect(getUrls.length).toBe(2);
-    expect(getUrls[0]).toBe('http://localhost:7071/a/p/i/entities/myentity');
-    expect(getUrls[1]).toBe('http://localhost:7071/a/p/i/entities/myentity');
+    expect(getUrls.length).toBe(3);
+    getUrls.map(url => expect(url).toBe('http://localhost:7071/a/p/i/entities/myentity'));
 
     expect(entitySet.items.length).toBe(1);
     const entityState = entitySet.items[0];
     expect(entityState.entityKey).toBe(entityKey);
-    expect((entityState as any).someField).toBe(fetchedFieldValue);
+    expect((entityState as any).someField).toBe(fetchedFieldValue + '1');
 });
 
 test('applies entity state change', async () => {
@@ -189,7 +191,7 @@ test('applies entity state change', async () => {
 
     const postUrls = [], getUrls = [];
 
-    const entityName = 'myentity3';
+    const entityName = 'MyEntity3';
     const entityKey = 'mykey3';
     const fetchedFieldValue = 'value3';
     const deliveredFieldValue = 'value4';
@@ -218,7 +220,7 @@ test('applies entity state change', async () => {
     (DurableEntitySet as any).HttpClient = fakeHttpClient;
 
     const stateChangedMessage1 = {
-        entityName,
+        entityName: entityName.toLowerCase(),
         entityKey,
         version: 2,
         stateDiff: [
@@ -227,7 +229,7 @@ test('applies entity state change', async () => {
     };
 
     const stateChangedMessage2 = {
-        entityName,
+        entityName: entityName.toLowerCase(),
         entityKey,
         version: 123
     };
@@ -263,7 +265,7 @@ test('drops destroyed entity from entity collection', async () => {
 
     const postUrls = [], getUrls = [];
 
-    const entityName = 'myentity4';
+    const entityName = 'MyEntity4';
     const entityKey = 'mykey4';
 
     const fakeHttpClient = {
@@ -288,7 +290,7 @@ test('drops destroyed entity from entity collection', async () => {
     (DurableEntitySet as any).HttpClient = fakeHttpClient;
 
     const stateChangedMessage = {
-        entityName,
+        entityName: entityName.toLowerCase(),
         entityKey,
         version: 2,
         isEntityDestructed: true
