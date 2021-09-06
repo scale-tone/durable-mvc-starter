@@ -38,8 +38,39 @@ export class DurableEntitySet<TState extends object> {
         // Registering ourselves as listeners for this type of entity
         DurableEntitySet.EntitySets[this._entityNameLowerCase] = this.items;
 
-        // Loading all existing entities
-        return DurableEntitySet.fetchAndApplyAllEntityStates(this._entityNameLowerCase);
+        // Trying to get cached entityIds from localStorage
+        const storedEntityIds = DurableEntitySet.getStoredEntityIds(this._entityNameLowerCase);
+
+        // If we have too many ids cached locally
+        if (storedEntityIds.length > DurableEntitySet.MaxEntitiesToLoadIndividually) {
+            
+            // Just loading all existing entities at once
+            return DurableEntitySet.fetchAndApplyAllEntityStates(this._entityNameLowerCase);
+        }
+
+        // First triggering parallel individual loads - this should be faster
+        const individualPromises = storedEntityIds.map(id => {
+
+            // Intentionally always resolves
+            return new Promise<void>((resolve) => {
+                const nameAndKey = DurableEntitySet.GetEntityNameAndKey(id);
+                DurableEntitySet
+                    .tryFetchingAndApplyingEntityState(nameAndKey.entityNameLowerCase, nameAndKey.entityKey, 0)
+                    .then(() => resolve(), (err) => {
+                        
+                        DurableEntitySet.Config.logger!.log(LogLevel.Warning, `DurableEntitySet: failed to fetch initial entity state: ${err}`);
+
+                        // In most cases this error indicates, that our stored entityIds are no longer valid, so we'd better drop them
+                        DurableEntitySet.removeStoredEntityIds(this._entityNameLowerCase);
+
+                        resolve();
+                    });
+            });
+        });
+
+        // After individual loads completed (no matter what the outcome is), still doing the normal mass-load
+        return Promise.all(individualPromises)
+            .then(() => DurableEntitySet.fetchAndApplyAllEntityStates(this._entityNameLowerCase));
     }
 
     // Manually attach a single entity with specific key
@@ -167,20 +198,54 @@ export class DurableEntitySet<TState extends object> {
     private static readonly SignalRReconnectIntervalInMs = 5000;
     private static readonly MaxRetryCount = 6;
     private static readonly RetryBaseIntervalMs = 500;
-    
+    private static readonly MaxEntitiesToLoadIndividually = 50;
 
     private static EntityStates: { [entityId: string]: DurableEntityClientStateContainer } = {};
+    private static readonly LocalStorageKnownIdsKey = 'DurableEntitySetKnownEntityIds';
 
     private static getEntityState(entityId: string): DurableEntityClientStateContainer {
         return this.EntityStates[entityId];
     }
 
+    private static getEntityStatesCopy(): { [entityId: string]: DurableEntityClientStateContainer } {
+        return Object.assign({}, this.EntityStates);
+    }
+
     private static addOrUpdateEntityState(entityId: string, stateContainer: DurableEntityClientStateContainer): void {
         this.EntityStates[entityId] = stateContainer;
+
+        if (!this.Config.doNotPersistKnownEntityIds && !!localStorage) {
+            localStorage.setItem(this.LocalStorageKnownIdsKey, JSON.stringify(Object.keys(this.EntityStates)));
+        }
     }
 
     private static removeEntityState(entityId: string): void {
         delete this.EntityStates[entityId];
+
+        if (!this.Config.doNotPersistKnownEntityIds && !!localStorage) {
+            localStorage.setItem(this.LocalStorageKnownIdsKey, JSON.stringify(Object.keys(this.EntityStates)));
+        }
+    }
+
+    private static getStoredEntityIds(entityNameLowerCase: string): string[] {
+
+        if (!!this.Config.doNotPersistKnownEntityIds || !localStorage) {
+            return [];
+        }
+
+        const entityIdsJson = localStorage.getItem(this.LocalStorageKnownIdsKey);
+        if (!entityIdsJson) {
+            return [];
+        }
+
+        return (JSON.parse(entityIdsJson) as string[])
+            .filter(id => this.GetEntityNameAndKey(id).entityNameLowerCase === entityNameLowerCase);
+    }
+
+    private static removeStoredEntityIds(entityNameLowerCase: string): void {
+        if (!!localStorage) {
+            localStorage.removeItem(this.LocalStorageKnownIdsKey);
+        }
     }
 
     private static entityAdded(entityNameLowerCase: string, entityKey: string, entityState: EntityStateWithKey) {
@@ -220,10 +285,10 @@ export class DurableEntitySet<TState extends object> {
         }
     }
 
-    private static fetchAndApplyEntityState(entityNameLowerCase: string, entityKey: string, desiredVersion: number, retryCount: number, currentEntityState: any = null): void {
+    private static tryFetchingAndApplyingEntityState(entityNameLowerCase: string, entityKey: string, desiredVersion: number, currentEntityState: any = null): Promise<void> {
 
         const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}/${entityKey}`;
-        this.HttpClient.get(uri).then(response => {
+        return this.HttpClient.get(uri).then(response => {
 
             const stateContainer = JSON.parse(response.content as string) as DurableEntityClientStateContainer;
             const entityId = EntityStateChangedMessage.FormatEntityId(entityNameLowerCase, entityKey);
@@ -252,8 +317,12 @@ export class DurableEntitySet<TState extends object> {
 
             // (Re)registering this entity
             this.addOrUpdateEntityState(entityId, { state: currentEntityState, version: stateContainer.version });
+        });
+    }
 
-        }).catch(err => {
+    private static fetchAndApplyEntityState(entityNameLowerCase: string, entityKey: string, desiredVersion: number, retryCount: number, currentEntityState: any = null): void {
+
+        this.tryFetchingAndApplyingEntityState(entityNameLowerCase, entityKey, desiredVersion, currentEntityState).catch(err => {
 
             if (retryCount < this.MaxRetryCount) {
 
@@ -274,6 +343,10 @@ export class DurableEntitySet<TState extends object> {
 
     private static fetchAndApplyAllEntityStates(entityNameLowerCase: string): Promise<void> {
 
+        // Making a shallow copy of current known states BEFORE triggering a call, 
+        // so that if any entity is removed during the call, it doesn't re-appear.
+        const existingEntityStates = this.getEntityStatesCopy();
+
         const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}`;
         return this.HttpClient.get(uri).then(response => {
 
@@ -283,7 +356,9 @@ export class DurableEntitySet<TState extends object> {
                 const entityId = EntityStateChangedMessage.FormatEntityId(entityNameLowerCase, entityKey);
                 const stateContainer = item as DurableEntityClientStateContainer;
 
-                const existingStateContainer = this.getEntityState(entityId);
+                const existingStateContainer = existingEntityStates[entityId];
+                delete existingEntityStates[entityId];
+
                 if (!existingStateContainer) {
 
                     makeAutoObservable(stateContainer.state);
@@ -305,6 +380,14 @@ export class DurableEntitySet<TState extends object> {
 
                     this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: ${entityId} is already known and is up to date. Skipping.`);
                 }
+            }
+
+            // Dropping instances that might have appeared up to this point
+            for (const deletedEntityId in existingEntityStates) {
+
+                this.removeEntityState(deletedEntityId);
+                const nameAndKey = this.GetEntityNameAndKey(deletedEntityId);
+                this.entityDeleted(nameAndKey.entityNameLowerCase, nameAndKey.entityKey);
             }
 
         }).catch(err => {
@@ -403,6 +486,12 @@ export class DurableEntitySet<TState extends object> {
         }, () => {
             setTimeout(() => this.reconnectToSignalR(), this.SignalRReconnectIntervalInMs);
         });
+    }
+
+    static GetEntityNameAndKey(entityId: string): { entityNameLowerCase: string, entityKey: string } {
+        
+        const match = /@([^@]+)@(.+)/.exec(entityId);
+        return { entityNameLowerCase: !match ? '' : match[1], entityKey: !match ? '' : match[2] };
     }
 
     // Applies incoming changes to an existing observable object so, that UI is re-rendered

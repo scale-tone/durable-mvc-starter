@@ -13,4 +13,10 @@ export interface IDurableEntitySetConfig {
 
     // Custom logger implementation
     logger?: ILogger;
+
+    // By default, DurableEntitySet will persist the list of known (loaded) EntityIds in localStorage,
+    // for faster retrieval of those entities upon page reload.
+    // Set this flag to false to disable this behavior (this might make the initial load of entities longer, 
+    // because retrieving a _list_ of entities is an expensive operation).
+    doNotPersistKnownEntityIds?: boolean;
 }

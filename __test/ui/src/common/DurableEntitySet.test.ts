@@ -1,9 +1,13 @@
-
 import { DurableEntitySet } from '../../../../ui/src/common/DurableEntitySet';
 import { BackendBaseUri } from '../../../../ui/src/common/DurableHttpClient';
 
 // Need to set it to an absolute URL to calm down SignalR's HttpConnection
 (BackendBaseUri as any) = 'http://localhost:7071/a/p/i';
+
+// Default behaviour for localStorage
+(global.localStorage as any) = {};
+global.localStorage.getItem = () => { return null; };
+global.localStorage.setItem = () => { };
 
 test('attaches an entity and fetches its state from server', async () => {
 
@@ -126,6 +130,7 @@ test('reconnects to SignalR and attaches entities', async () => {
 
     const entityKey = 'mykey';
     const fetchedFieldValue = 'some value';
+    const nonExistendEntityKey = 'unknown-entity-key';
 
     var count = 0;
 
@@ -141,7 +146,18 @@ test('reconnects to SignalR and attaches entities', async () => {
         },
 
         get: (url) => {
+
             getUrls.push(url);
+
+            if (url.endsWith(nonExistendEntityKey)) {
+                return Promise.resolve({
+                    content: JSON.stringify({
+                        version: 1,
+                        state: {}
+                    })
+                });
+            }
+
             return Promise.resolve({
                 content: JSON.stringify([{
                     version: count === 1 ? 2 : 1,
@@ -155,14 +171,15 @@ test('reconnects to SignalR and attaches entities', async () => {
     };
 
     (DurableEntitySet as any).HttpClient = fakeHttpClient;
-
+    
     // act
 
     const entitySet = new DurableEntitySet('MyEntity', true);
 
-    // Attaching all entities two more times, to make sure it doesn't cause duplicates
-    entitySet.attachAllEntities();
-    entitySet.attachAllEntities();
+    // Attaching some more entities multiple times, to make sure it doesn't cause duplicates
+    await entitySet.attachEntity(nonExistendEntityKey);
+    await entitySet.attachAllEntities();
+    await entitySet.attachAllEntities();
 
     // Assert
 
@@ -176,8 +193,11 @@ test('reconnects to SignalR and attaches entities', async () => {
     expect(postUrls.length).toBe(1);
     expect(postUrls[0]).toBe('http://localhost:7071/a/p/i/negotiate');
 
-    expect(getUrls.length).toBe(3);
-    getUrls.map(url => expect(url).toBe('http://localhost:7071/a/p/i/entities/myentity'));
+    expect(getUrls.length).toBe(4);
+    expect(getUrls[0]).toBe(`http://localhost:7071/a/p/i/entities/myentity/${nonExistendEntityKey}`);
+    expect(getUrls[1]).toBe('http://localhost:7071/a/p/i/entities/myentity');
+    expect(getUrls[2]).toBe('http://localhost:7071/a/p/i/entities/myentity');
+    expect(getUrls[3]).toBe('http://localhost:7071/a/p/i/entities/myentity');
 
     expect(entitySet.items.length).toBe(1);
     const entityState = entitySet.items[0];
@@ -262,7 +282,7 @@ test('applies entity state change', async () => {
 test('drops destroyed entity from entity collection', async () => {
 
     // arrange
-
+    
     const postUrls = [], getUrls = [];
 
     const entityName = 'MyEntity4';
