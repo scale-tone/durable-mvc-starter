@@ -70,11 +70,11 @@ The required boilerplate (`index.ts` and `function.json` files) for exposing you
 # How to bind to your entities on the client
 
 [DurableEntitySet](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts) provides static methods, that return a single observable state object: 
-* [createEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L109) - creates an entity with given key, if not created yet.
-* [attachEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L85) - doesn't create anything, just tries to attach to an existing entity.
+* [createEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L112) - creates an entity with given key, if not created yet.
+* [attachEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L88) - doesn't create anything, just tries to attach to an existing entity.
 
 To get an [observable collection](https://mobx.js.org/observable-state.html) of entities of a certain type create an instance of [DurableEntitySet\<TState\>](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts) class and then bind to its [items](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L18) property. Newly added entities will automatically appear there and removed (destroyed) entities will automatically be dropped.
 
 To send signals to your entities use: 
-* [DurableEntitySet.signalEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L118) - sends a signal in a fire-and-forget manner. 
-* [DurableEntitySet.callEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L128) - 'calls' an entity aka returns a Promise, that will be resolved once the sent signal actually gets processed.
+* [DurableEntitySet.signalEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L121) - sends a signal in a fire-and-forget manner. 
+* [DurableEntitySet.callEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L131) - 'calls' an entity aka returns a Promise, that will be resolved once the sent signal actually gets processed.
