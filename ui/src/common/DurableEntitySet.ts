@@ -8,6 +8,7 @@ import { SignalRClientHandlerName, SignalRSignalResponseHandlerName, UpdateMetad
 import { DurableEntityClientStateContainer } from '../shared/common/DurableEntityClientStateContainer';
 import { IDurableEntitySetConfig } from './IDurableEntitySetConfig';
 import { DurableHttpClient, BackendBaseUri } from './DurableHttpClient';
+import { EntityStateMap } from './EntityStateMap';
 
 export type EntityStateWithKey = { entityKey: string };
 
@@ -38,38 +39,9 @@ export class DurableEntitySet<TState extends object> {
         // Registering ourselves as listeners for this type of entity
         DurableEntitySet.EntitySets[this._entityNameLowerCase] = this.items;
 
-        // Trying to get cached entityIds from localStorage
-        const storedEntityIds = DurableEntitySet.getStoredEntityIds(this._entityNameLowerCase);
-
-        // If we have too many ids cached locally
-        if (storedEntityIds.length > DurableEntitySet.MaxEntitiesToLoadIndividually) {
-            
-            // Just loading all existing entities at once
-            return DurableEntitySet.fetchAndApplyAllEntityStates(this._entityNameLowerCase);
-        }
-
-        // First triggering parallel individual loads - this should be faster
-        const individualPromises = storedEntityIds.map(id => {
-
-            // Intentionally always resolves
-            return new Promise<void>((resolve) => {
-                const nameAndKey = DurableEntitySet.GetEntityNameAndKey(id);
-                DurableEntitySet
-                    .tryFetchingAndApplyingEntityState(nameAndKey.entityNameLowerCase, nameAndKey.entityKey, 0)
-                    .then(() => resolve(), (err) => {
-                        
-                        DurableEntitySet.Config.logger!.log(LogLevel.Warning, `DurableEntitySet: failed to fetch initial entity state: ${err}`);
-
-                        // In most cases this error indicates, that our stored entityIds are no longer valid, so we'd better drop them
-                        DurableEntitySet.removeStoredEntityIds(this._entityNameLowerCase);
-
-                        resolve();
-                    });
-            });
-        });
-
-        // After individual loads completed (no matter what the outcome is), still doing the normal mass-load
-        return Promise.all(individualPromises)
+        // First trying to fetch states for stored entityIds
+        return DurableEntitySet.fetchAndApplyKnownEntityStates(this._entityNameLowerCase)
+            // Then still always doing a mass-load, because some entities might be added/removed during the offline period
             .then(() => DurableEntitySet.fetchAndApplyAllEntityStates(this._entityNameLowerCase));
     }
 
@@ -78,7 +50,7 @@ export class DurableEntitySet<TState extends object> {
 
         const entityId = EntityStateChangedMessage.FormatEntityId(this._entityNameLowerCase, entityKey);
 
-        if (!!DurableEntitySet.getEntityState(entityId)) {
+        if (!!DurableEntitySet.EntityStates.getState(entityId)) {
             return;
         }
 
@@ -120,7 +92,7 @@ export class DurableEntitySet<TState extends object> {
         // Inside Durable Functions entity names are always lower-case, so we need to convert
         const entityNameLowerCase = entityName.toLowerCase();
 
-        const existingEntity = this.getEntityState(EntityStateChangedMessage.FormatEntityId(entityNameLowerCase, entityKey));
+        const existingEntity = this.EntityStates.getState(EntityStateChangedMessage.FormatEntityId(entityNameLowerCase, entityKey));
         if (!!existingEntity) {
             // If it is a known entity, then just returning it
             return existingEntity.state as TState;
@@ -198,55 +170,13 @@ export class DurableEntitySet<TState extends object> {
     private static readonly SignalRReconnectIntervalInMs = 5000;
     private static readonly MaxRetryCount = 6;
     private static readonly RetryBaseIntervalMs = 500;
-    private static readonly MaxEntitiesToLoadIndividually = 50;
+    private static readonly DefaultMaxKnownEntityIdsToPersist = 100;
 
-    private static EntityStates: { [entityId: string]: DurableEntityClientStateContainer } = {};
-    private static readonly LocalStorageKnownIdsKey = 'DurableEntitySetKnownEntityIds';
-
-    private static getEntityState(entityId: string): DurableEntityClientStateContainer {
-        return this.EntityStates[entityId];
-    }
-
-    private static getEntityStatesCopy(): { [entityId: string]: DurableEntityClientStateContainer } {
-        return Object.assign({}, this.EntityStates);
-    }
-
-    private static addOrUpdateEntityState(entityId: string, stateContainer: DurableEntityClientStateContainer): void {
-        this.EntityStates[entityId] = stateContainer;
-
-        if (!this.Config.doNotPersistKnownEntityIds && !!localStorage) {
-            localStorage.setItem(this.LocalStorageKnownIdsKey, JSON.stringify(Object.keys(this.EntityStates)));
-        }
-    }
-
-    private static removeEntityState(entityId: string): void {
-        delete this.EntityStates[entityId];
-
-        if (!this.Config.doNotPersistKnownEntityIds && !!localStorage) {
-            localStorage.setItem(this.LocalStorageKnownIdsKey, JSON.stringify(Object.keys(this.EntityStates)));
-        }
-    }
-
-    private static getStoredEntityIds(entityNameLowerCase: string): string[] {
-
-        if (!!this.Config.doNotPersistKnownEntityIds || !localStorage) {
-            return [];
-        }
-
-        const entityIdsJson = localStorage.getItem(this.LocalStorageKnownIdsKey);
-        if (!entityIdsJson) {
-            return [];
-        }
-
-        return (JSON.parse(entityIdsJson) as string[])
-            .filter(id => this.GetEntityNameAndKey(id).entityNameLowerCase === entityNameLowerCase);
-    }
-
-    private static removeStoredEntityIds(entityNameLowerCase: string): void {
-        if (!!localStorage) {
-            localStorage.removeItem(this.LocalStorageKnownIdsKey);
-        }
-    }
+    private static EntityStates = new EntityStateMap(() =>
+        DurableEntitySet.Config.maxKnownEntityIdsToPersist === undefined ?
+            DurableEntitySet.DefaultMaxKnownEntityIdsToPersist :
+            DurableEntitySet.Config.maxKnownEntityIdsToPersist
+    );
 
     private static entityAdded(entityNameLowerCase: string, entityKey: string, entityState: EntityStateWithKey) {
 
@@ -285,10 +215,10 @@ export class DurableEntitySet<TState extends object> {
         }
     }
 
-    private static tryFetchingAndApplyingEntityState(entityNameLowerCase: string, entityKey: string, desiredVersion: number, currentEntityState: any = null): Promise<void> {
+    private static fetchAndApplyEntityState(entityNameLowerCase: string, entityKey: string, desiredVersion: number, retryCount: number, currentEntityState: any = null): void {
 
         const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}/${entityKey}`;
-        return this.HttpClient.get(uri).then(response => {
+        this.HttpClient.get(uri).then(response => {
 
             const stateContainer = JSON.parse(response.content as string) as DurableEntityClientStateContainer;
             const entityId = EntityStateChangedMessage.FormatEntityId(entityNameLowerCase, entityKey);
@@ -309,20 +239,16 @@ export class DurableEntitySet<TState extends object> {
                 this.applyStateChangesFrom(currentEntityState, stateContainer.state);
             }
 
-            if (!this.getEntityState(entityId)) {
+            if (!this.EntityStates.getState(entityId)) {
                 
                 // Adding the newly-arrived state into collections, if any
                 this.entityAdded(entityNameLowerCase, entityKey, currentEntityState);
             }
 
             // (Re)registering this entity
-            this.addOrUpdateEntityState(entityId, { state: currentEntityState, version: stateContainer.version });
-        });
-    }
+            this.EntityStates.addOrUpdateState(entityId, { state: currentEntityState, version: stateContainer.version });
 
-    private static fetchAndApplyEntityState(entityNameLowerCase: string, entityKey: string, desiredVersion: number, retryCount: number, currentEntityState: any = null): void {
-
-        this.tryFetchingAndApplyingEntityState(entityNameLowerCase, entityKey, desiredVersion, currentEntityState).catch(err => {
+        }).catch(err => {
 
             if (retryCount < this.MaxRetryCount) {
 
@@ -345,7 +271,7 @@ export class DurableEntitySet<TState extends object> {
 
         // Making a shallow copy of current known states BEFORE triggering a call, 
         // so that if any entity is removed during the call, it doesn't re-appear.
-        const existingEntityStates = this.getEntityStatesCopy();
+        const existingEntityStates = this.EntityStates.getStatesCopy();
 
         const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}`;
         return this.HttpClient.get(uri).then(response => {
@@ -362,7 +288,7 @@ export class DurableEntitySet<TState extends object> {
                 if (!existingStateContainer) {
 
                     makeAutoObservable(stateContainer.state);
-                    this.addOrUpdateEntityState(entityId, stateContainer);
+                    this.EntityStates.addOrUpdateState(entityId, stateContainer);
 
                     // Adding the newly-arrived state into collections, if any
                     this.entityAdded(entityNameLowerCase, entityKey, stateContainer.state as any);
@@ -385,8 +311,8 @@ export class DurableEntitySet<TState extends object> {
             // Dropping instances that might have appeared up to this point
             for (const deletedEntityId in existingEntityStates) {
 
-                this.removeEntityState(deletedEntityId);
-                const nameAndKey = this.GetEntityNameAndKey(deletedEntityId);
+                this.EntityStates.removeState(deletedEntityId);
+                const nameAndKey = DurableEntityClientStateContainer.GetEntityNameAndKey(deletedEntityId);
                 this.entityDeleted(nameAndKey.entityNameLowerCase, nameAndKey.entityKey);
             }
 
@@ -395,16 +321,68 @@ export class DurableEntitySet<TState extends object> {
         });
     }
 
+    private static fetchAndApplyKnownEntityStates(entityNameLowerCase: string): Promise<void> {
+
+        const entityIds = this.EntityStates.getStoredEntityIds(entityNameLowerCase);
+
+        // Making a shallow copy of current known states BEFORE triggering a call, 
+        // so that if any entity is removed during the call, it doesn't re-appear.
+        const existingEntityStates = this.EntityStates.getStatesCopy();
+
+        const uri = `${BackendBaseUri}/entities`;
+        return this.HttpClient.post(uri, { content: JSON.stringify(entityIds) }).then(response => {
+
+            const stateContainers = JSON.parse(response.content as string) as DurableEntityClientStateContainer[];
+
+            for (var i = 0; i < entityIds.length; i++) {
+
+                const entityId = entityIds[i];
+                const nameAndKey = DurableEntityClientStateContainer.GetEntityNameAndKey(entityId);
+                const stateContainer = stateContainers[i];
+
+                const existingStateContainer = existingEntityStates[entityId];
+                if (!existingStateContainer) {
+
+                    makeAutoObservable(stateContainer.state);
+                    this.EntityStates.addOrUpdateState(entityId, stateContainer);
+
+                    // Adding the newly-arrived state into collections, if any
+                    this.entityAdded(nameAndKey.entityNameLowerCase, nameAndKey.entityKey, stateContainer.state as any);
+                    
+
+                } else if (existingStateContainer.version < stateContainer.version) {
+
+                    this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: ${entityId}, local version ${existingStateContainer.version}, remote version ${stateContainer.version}. State was updated.`);
+
+                    // Otherwise applying the change to the existing object, so that UI is re-rendered
+                    this.applyStateChangesFrom(existingStateContainer.state, stateContainer.state);
+                    existingStateContainer.version = stateContainer.version;
+
+                } else {
+
+                    this.Config.logger!.log(LogLevel.Information, `DurableEntitySet: ${entityId} is already known and is up to date. Skipping.`);
+                }
+            }
+
+        }).catch(err => {
+
+            this.Config.logger!.log(LogLevel.Warning, `DurableEntitySet: failed to fetch known entity states: ${err}`);
+
+            // In most cases this error indicates, that our stored entityIds are no longer valid, so we'd better drop them
+            this.EntityStates.removeStoredEntityIds(entityNameLowerCase);
+        });
+    }
+    
     private static entityStateChangedMessageHandler(msg: EntityStateChangedMessage): void {
 
         const entityId = EntityStateChangedMessage.GetEntityId(msg);
 
         this.Config.logger!.log(LogLevel.Trace, `DurableEntitySet: ${entityId} changed to version ${msg.version}`);
 
-        const existingStateContainer = this.getEntityState(entityId);
+        const existingStateContainer = this.EntityStates.getState(entityId);
         if (msg.isEntityDestructed) {
 
-            this.removeEntityState(entityId);
+            this.EntityStates.removeState(entityId);
 
             this.entityDeleted(msg.entityName, msg.entityKey);
 
@@ -486,12 +464,6 @@ export class DurableEntitySet<TState extends object> {
         }, () => {
             setTimeout(() => this.reconnectToSignalR(), this.SignalRReconnectIntervalInMs);
         });
-    }
-
-    static GetEntityNameAndKey(entityId: string): { entityNameLowerCase: string, entityKey: string } {
-        
-        const match = /@([^@]+)@(.+)/.exec(entityId);
-        return { entityNameLowerCase: !match ? '' : match[1], entityKey: !match ? '' : match[2] };
     }
 
     // Applies incoming changes to an existing observable object so, that UI is re-rendered

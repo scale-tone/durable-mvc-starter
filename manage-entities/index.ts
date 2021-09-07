@@ -8,22 +8,55 @@ import { DurableEntityClientStateContainer } from '../ui/src/shared/common/Durab
 import { ClientPrincipalHeaderName } from '../ui/src/shared/common/Constants';
 
 // Handles basic entity operations 
-export default async function (context: Context, req: HttpRequest): Promise<void> {
+export default async function (context: Context, req: HttpRequest): Promise<{ [key: string]: any }> {
 
-    const entityName = context.bindingData.entityName.toString();
-    const entityKey = context.bindingData.entityKey?.toString();
+    const entityName = context.bindingData.entityName as string;
+    const entityKey = context.bindingData.entityKey as string;
     const callingUser = req.headers[ClientPrincipalHeaderName];
 
     const durableClient = DurableFunctions.getClient(context);
 
     if (req.method === "POST") {
 
-        // Sending a signal
-        
-        const correlationId = await sendSignal(durableClient, entityName, entityKey, context.bindingData.signalName?.toString(), req.body, callingUser);
+        const signalName = context.bindingData.signalName as string;
+        if (!signalName) {
+            // Loading and returning a bunch of entities
 
-        // Returning correlationId back to client, so that it can subscribe to results
-        context.res = { body: { correlationId } };
+            if (!(req.body instanceof Array)) {
+                
+                context.res = { status: 404 };
+                return;
+            }
+
+            const entityStatusPromises = (req.body as string[])
+                .map(entityId => DurableEntityClientStateContainer.GetEntityNameAndKey(entityId))
+                .map(entityId => getEntityStatus(durableClient, entityId.entityNameLowerCase, entityId.entityKey, callingUser));
+
+            const entityStatuses = await Promise.all(entityStatusPromises);
+
+            // If any of requests failed
+            const failedStatus = entityStatuses.find(s => !!s.status);
+            if (!!failedStatus) {
+
+                // Returning that failed status
+                context.res = { status: failedStatus.status };
+
+            } else {
+
+                // Returning the array of statuses
+                context.res = {
+                    body: entityStatuses.map(s => s.body)
+                }
+            }
+            
+        } else {
+            // Sending a signal
+            
+            const correlationId = await sendSignal(durableClient, entityName, entityKey, signalName, req.body, callingUser);
+
+            // Returning correlationId back to client, so that it can subscribe to results
+            context.res = { body: { correlationId } };
+        }
 
     } else if (!entityKey) {
 
@@ -35,33 +68,38 @@ export default async function (context: Context, req: HttpRequest): Promise<void
     } else {
 
         // Returning a single entity status
-        
-        const stateResponse = await durableClient.readEntityState(new DurableFunctions.EntityId(entityName, entityKey));
+        context.res = await getEntityStatus(durableClient, entityName, entityKey, callingUser);        
+    }
+};
 
-        if (!stateResponse || !stateResponse.entityExists) {
+// Returns entity status in form of DurableEntityClientStateContainer object
+async function getEntityStatus(durableClient: DurableOrchestrationClient, entityName: string, entityKey: string, callingUser: string): Promise<{ status?: number, body?: DurableEntityClientStateContainer }> {
+    
+    const stateResponse = await durableClient.readEntityState(new DurableFunctions.EntityId(entityName, entityKey));
+
+    if (!stateResponse || !stateResponse.entityExists) {
+        
+        return { status: 404 };
+
+    } else {
+
+        const stateContainer = stateResponse.entityState as DurableEntityStateContainer<any>;
+
+        if (DurableEntityStateContainer.isAccessAllowed(stateContainer, callingUser)) {
             
-            context.res = { status: 404 };
+            return {
+                body: {
+                    version: stateContainer.__metadata.version,
+                    state: stateContainer.state
+                }
+            };
 
         } else {
 
-            const stateContainer = stateResponse.entityState as DurableEntityStateContainer<any>;
-
-            if (DurableEntityStateContainer.isAccessAllowed(stateContainer, callingUser)) {
-                
-                context.res = {
-                    body: <DurableEntityClientStateContainer>{
-                        version: stateContainer.__metadata.version,
-                        state: stateContainer.state
-                    }
-                };
-
-            } else {
-
-                context.res = { status: 403 };
-            }
+            return { status: 403 };
         }
     }
-};
+}
 
 // Sends a signal to (calls a method of) the given entity
 async function sendSignal(durableClient: DurableOrchestrationClient, entityName: string, entityKey: string, signalName: string, argument: any, callingUser: string): Promise<string> {

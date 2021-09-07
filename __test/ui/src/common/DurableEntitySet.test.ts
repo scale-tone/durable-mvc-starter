@@ -8,6 +8,7 @@ import { BackendBaseUri } from '../../../../ui/src/common/DurableHttpClient';
 (global.localStorage as any) = {};
 global.localStorage.getItem = () => { return null; };
 global.localStorage.setItem = () => { };
+global.localStorage.removeItem = () => { };
 
 test('attaches an entity and fetches its state from server', async () => {
 
@@ -190,8 +191,11 @@ test('reconnects to SignalR and attaches entities', async () => {
 
     expect(onCloseCallback.toString()).toBe('() => this.reconnectToSignalR()');
 
-    expect(postUrls.length).toBe(1);
+    expect(postUrls.length).toBe(4);
     expect(postUrls[0]).toBe('http://localhost:7071/a/p/i/negotiate');
+    expect(postUrls[1]).toBe('http://localhost:7071/a/p/i/entities');
+    expect(postUrls[2]).toBe('http://localhost:7071/a/p/i/entities');
+    expect(postUrls[3]).toBe('http://localhost:7071/a/p/i/entities');
 
     expect(getUrls.length).toBe(4);
     expect(getUrls[0]).toBe(`http://localhost:7071/a/p/i/entities/myentity/${nonExistendEntityKey}`);

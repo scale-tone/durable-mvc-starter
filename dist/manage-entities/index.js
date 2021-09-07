@@ -11,20 +11,46 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const DurableFunctions = require("durable-functions");
 const DurableEntityStateContainer_1 = require("../common/DurableEntityStateContainer");
+const DurableEntityClientStateContainer_1 = require("../ui/src/shared/common/DurableEntityClientStateContainer");
 const Constants_1 = require("../ui/src/shared/common/Constants");
 // Handles basic entity operations 
 function default_1(context, req) {
-    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
-        const entityName = context.bindingData.entityName.toString();
-        const entityKey = (_a = context.bindingData.entityKey) === null || _a === void 0 ? void 0 : _a.toString();
+        const entityName = context.bindingData.entityName;
+        const entityKey = context.bindingData.entityKey;
         const callingUser = req.headers[Constants_1.ClientPrincipalHeaderName];
         const durableClient = DurableFunctions.getClient(context);
         if (req.method === "POST") {
-            // Sending a signal
-            const correlationId = yield sendSignal(durableClient, entityName, entityKey, (_b = context.bindingData.signalName) === null || _b === void 0 ? void 0 : _b.toString(), req.body, callingUser);
-            // Returning correlationId back to client, so that it can subscribe to results
-            context.res = { body: { correlationId } };
+            const signalName = context.bindingData.signalName;
+            if (!signalName) {
+                // Loading and returning a bunch of entities
+                if (!(req.body instanceof Array)) {
+                    context.res = { status: 404 };
+                    return;
+                }
+                const entityStatusPromises = req.body
+                    .map(entityId => DurableEntityClientStateContainer_1.DurableEntityClientStateContainer.GetEntityNameAndKey(entityId))
+                    .map(entityId => getEntityStatus(durableClient, entityId.entityNameLowerCase, entityId.entityKey, callingUser));
+                const entityStatuses = yield Promise.all(entityStatusPromises);
+                // If any of requests failed
+                const failedStatus = entityStatuses.find(s => !!s.status);
+                if (!!failedStatus) {
+                    // Returning that failed status
+                    context.res = { status: failedStatus.status };
+                }
+                else {
+                    // Returning the array of statuses
+                    context.res = {
+                        body: entityStatuses.map(s => s.body)
+                    };
+                }
+            }
+            else {
+                // Sending a signal
+                const correlationId = yield sendSignal(durableClient, entityName, entityKey, signalName, req.body, callingUser);
+                // Returning correlationId back to client, so that it can subscribe to results
+                context.res = { body: { correlationId } };
+            }
         }
         else if (!entityKey) {
             // Collecting and returning all entities visible to this user
@@ -33,29 +59,35 @@ function default_1(context, req) {
         }
         else {
             // Returning a single entity status
-            const stateResponse = yield durableClient.readEntityState(new DurableFunctions.EntityId(entityName, entityKey));
-            if (!stateResponse || !stateResponse.entityExists) {
-                context.res = { status: 404 };
-            }
-            else {
-                const stateContainer = stateResponse.entityState;
-                if (DurableEntityStateContainer_1.DurableEntityStateContainer.isAccessAllowed(stateContainer, callingUser)) {
-                    context.res = {
-                        body: {
-                            version: stateContainer.__metadata.version,
-                            state: stateContainer.state
-                        }
-                    };
-                }
-                else {
-                    context.res = { status: 403 };
-                }
-            }
+            context.res = yield getEntityStatus(durableClient, entityName, entityKey, callingUser);
         }
     });
 }
 exports.default = default_1;
 ;
+// Returns entity status in form of DurableEntityClientStateContainer object
+function getEntityStatus(durableClient, entityName, entityKey, callingUser) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const stateResponse = yield durableClient.readEntityState(new DurableFunctions.EntityId(entityName, entityKey));
+        if (!stateResponse || !stateResponse.entityExists) {
+            return { status: 404 };
+        }
+        else {
+            const stateContainer = stateResponse.entityState;
+            if (DurableEntityStateContainer_1.DurableEntityStateContainer.isAccessAllowed(stateContainer, callingUser)) {
+                return {
+                    body: {
+                        version: stateContainer.__metadata.version,
+                        state: stateContainer.state
+                    }
+                };
+            }
+            else {
+                return { status: 403 };
+            }
+        }
+    });
+}
 // Sends a signal to (calls a method of) the given entity
 function sendSignal(durableClient, entityName, entityKey, signalName, argument, callingUser) {
     return __awaiter(this, void 0, void 0, function* () {

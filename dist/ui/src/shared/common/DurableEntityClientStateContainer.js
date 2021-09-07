@@ -7,6 +7,11 @@ class DurableEntityClientStateContainer {
         this.version = 0;
         this.state = {};
     }
+    // Helper method for parsing entityIds
+    static GetEntityNameAndKey(entityId) {
+        const match = /@([^@]+)@(.+)/.exec(entityId);
+        return { entityNameLowerCase: !match ? '' : match[1], entityKey: !match ? '' : match[2] };
+    }
 }
 exports.DurableEntityClientStateContainer = DurableEntityClientStateContainer;
 //# sourceMappingURL=DurableEntityClientStateContainer.js.map

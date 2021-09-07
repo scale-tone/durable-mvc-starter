@@ -3,7 +3,7 @@
         {
             "authLevel": "anonymous",
             "type": "httpTrigger",
-            "route": "a/p/i/entities/{entityName}/{entityKey?}/{signalName?}",
+            "route": "a/p/i/entities/{entityName?}/{entityKey?}/{signalName?}",
             "direction": "in",
             "name": "req",
             "methods": [
