@@ -1,5 +1,5 @@
 
-import { DurableEntity, VisibilityEnum } from '../Common/DurableEntity';
+import { DurableEntity, VisibilityEnum } from '../common/DurableEntity';
 import { CounterState } from '../ui/src/shared/CounterState';
 
 // Sample counter entity

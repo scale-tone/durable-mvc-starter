@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CounterEntity = void 0;
-const DurableEntity_1 = require("../Common/DurableEntity");
+const DurableEntity_1 = require("../common/DurableEntity");
 const CounterState_1 = require("../ui/src/shared/CounterState");
 // Sample counter entity
 class CounterEntity extends DurableEntity_1.DurableEntity {
