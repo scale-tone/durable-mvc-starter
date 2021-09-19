@@ -1,6 +1,7 @@
 import { Context } from "@azure/functions"
 
 const fs = require('fs');
+const path = require('path');
 const util = require('util');
 const readFileAsync = util.promisify(fs.readFile);
 const fileExistsAsync = util.promisify(fs.exists);
@@ -13,7 +14,7 @@ export default async function (context: Context): Promise<void> {
 
     const p1 = context.bindingData.p1;
     const p2 = context.bindingData.p2;
-    const p3 = context.bindingData.p3;
+    const p3 = !!context.bindingData.p3 ? path.basename(context.bindingData.p3) : '';
 
     const fileMap = {
         'static/css': {
