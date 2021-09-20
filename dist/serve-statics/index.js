@@ -9,18 +9,18 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs = require('fs');
-const path = require('path');
-const util = require('util');
+const fs = require("fs");
+const path = require("path");
+const util = require("util");
 const readFileAsync = util.promisify(fs.readFile);
-const fileExistsAsync = util.promisify(fs.exists);
 // Root folder where all the statics are copied to
 const wwwroot = './ui/build';
 // Serves statics for the client UI
 function default_1(context) {
     return __awaiter(this, void 0, void 0, function* () {
-        const p1 = context.bindingData.p1;
-        const p2 = context.bindingData.p2;
+        // Sanitizing input, just in case
+        const p1 = !!context.bindingData.p1 ? path.basename(context.bindingData.p1) : '';
+        const p2 = !!context.bindingData.p2 ? path.basename(context.bindingData.p2) : '';
         const p3 = !!context.bindingData.p3 ? path.basename(context.bindingData.p3) : '';
         const fileMap = {
             'static/css': {
@@ -50,7 +50,7 @@ function default_1(context) {
         };
         const mapEntry = fileMap[`${p1}/${p2}`];
         if (!!mapEntry) {
-            if (yield fileExistsAsync(mapEntry.fileName)) {
+            if (!!fs.existsSync(mapEntry.fileName)) {
                 context.res = {
                     body: yield readFileAsync(mapEntry.fileName),
                     headers: { 'Content-Type': mapEntry.contentType }

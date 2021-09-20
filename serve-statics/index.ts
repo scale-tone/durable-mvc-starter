@@ -1,10 +1,9 @@
 import { Context } from "@azure/functions"
 
-const fs = require('fs');
-const path = require('path');
-const util = require('util');
+import * as fs from 'fs';
+import * as path from 'path';
+import * as util from 'util';
 const readFileAsync = util.promisify(fs.readFile);
-const fileExistsAsync = util.promisify(fs.exists);
 
 // Root folder where all the statics are copied to
 const wwwroot = './ui/build';
@@ -12,8 +11,9 @@ const wwwroot = './ui/build';
 // Serves statics for the client UI
 export default async function (context: Context): Promise<void> {
 
-    const p1 = context.bindingData.p1;
-    const p2 = context.bindingData.p2;
+    // Sanitizing input, just in case
+    const p1 = !!context.bindingData.p1 ? path.basename(context.bindingData.p1) : '';
+    const p2 = !!context.bindingData.p2 ? path.basename(context.bindingData.p2) : '';
     const p3 = !!context.bindingData.p3 ? path.basename(context.bindingData.p3) : '';
 
     const fileMap = {
@@ -47,7 +47,7 @@ export default async function (context: Context): Promise<void> {
 
     if (!!mapEntry) {
 
-        if (await fileExistsAsync(mapEntry.fileName)) {
+        if (!!fs.existsSync(mapEntry.fileName)) {
 
             context.res = {
                 body: await readFileAsync(mapEntry.fileName),
