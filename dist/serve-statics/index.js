@@ -51,9 +51,13 @@ function default_1(context) {
         const mapEntry = fileMap[`${p1}/${p2}`];
         if (!!mapEntry) {
             if (!!fs.existsSync(mapEntry.fileName)) {
+                const lastModifiedTime = (yield fs.promises.stat(mapEntry.fileName)).mtime;
                 context.res = {
                     body: yield readFileAsync(mapEntry.fileName),
-                    headers: { 'Content-Type': mapEntry.contentType }
+                    headers: {
+                        'Content-Type': mapEntry.contentType,
+                        'Last-Modified': lastModifiedTime.toUTCString()
+                    }
                 };
             }
             else {
@@ -62,9 +66,14 @@ function default_1(context) {
         }
         else {
             // Returning index.html by default, to support client routing
+            const indexHtmlPath = `${wwwroot}/index.html`;
+            const lastModifiedTime = (yield fs.promises.stat(indexHtmlPath)).mtime;
             context.res = {
-                body: yield readFileAsync(`${wwwroot}/index.html`),
-                headers: { 'Content-Type': 'text/html; charset=UTF-8' }
+                body: yield readFileAsync(indexHtmlPath),
+                headers: {
+                    'Content-Type': 'text/html; charset=UTF-8',
+                    'Last-Modified': lastModifiedTime.toUTCString()
+                }
             };
         }
     });

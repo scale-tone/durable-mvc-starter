@@ -25,6 +25,7 @@ test('returns index.html by default', async () => {
     await serve_statics(context);
     
     expect(context.res.headers['Content-Type']).toBe('text/html; charset=UTF-8');
+    expect(context.res.headers['Last-Modified']).toBeDefined();
 
     const body = context.res.body.toString() as string;
     expect(body.startsWith('<!doctype html>')).toBeTruthy();
@@ -41,6 +42,7 @@ test('returns index.html for arbitrary path', async () => {
     await serve_statics(context);    
     
     expect(context.res.headers['Content-Type']).toBe('text/html; charset=UTF-8');
+    expect(context.res.headers['Last-Modified']).toBeDefined();
 
     const body = context.res.body.toString() as string;
     expect(body.startsWith('<!doctype html>')).toBeTruthy();
@@ -59,6 +61,7 @@ test('returns some css', async () => {
     await serve_statics(context);    
     
     expect(context.res.headers['Content-Type']).toBe('text/css; charset=utf-8');
+    expect(context.res.headers['Last-Modified']).toBeDefined();
 
     const body = context.res.body.toString() as string;
     expect(body).toBeDefined();

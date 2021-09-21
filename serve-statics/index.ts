@@ -49,9 +49,14 @@ export default async function (context: Context): Promise<void> {
 
         if (!!fs.existsSync(mapEntry.fileName)) {
 
+            const lastModifiedTime = (await fs.promises.stat(mapEntry.fileName)).mtime;
+
             context.res = {
                 body: await readFileAsync(mapEntry.fileName),
-                headers: { 'Content-Type': mapEntry.contentType }
+                headers: {
+                    'Content-Type': mapEntry.contentType,
+                    'Last-Modified': lastModifiedTime.toUTCString()
+                }
             };
 
         } else {
@@ -62,9 +67,16 @@ export default async function (context: Context): Promise<void> {
     } else {
 
         // Returning index.html by default, to support client routing
+
+        const indexHtmlPath = `${wwwroot}/index.html`;
+        const lastModifiedTime = (await fs.promises.stat(indexHtmlPath)).mtime;
+
         context.res = {
-            body: await readFileAsync(`${wwwroot}/index.html`),
-            headers: { 'Content-Type': 'text/html; charset=UTF-8' }
+            body: await readFileAsync(indexHtmlPath),
+            headers: {
+                'Content-Type': 'text/html; charset=UTF-8',
+                'Last-Modified': lastModifiedTime.toUTCString()
+            }
         };
     }
 };
