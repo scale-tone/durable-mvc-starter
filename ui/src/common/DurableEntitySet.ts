@@ -18,10 +18,10 @@ export class DurableEntitySet<TState extends object> {
     // All attached entities will appear in this observable array
     items: (TState & EntityStateWithKey)[] = [];
     
-    constructor(private _entityNameLowerCase: string, attachToAll: boolean = true) {
+    constructor(entityName: string, attachToAll: boolean = true) {
 
         // Inside Durable Functions entity names are always lower-case, so we need to convert
-        this._entityNameLowerCase = this._entityNameLowerCase.toLowerCase();
+        this._entityNameLowerCase = entityName.toLowerCase();
 
         makeObservable(this, { items: observable });
         
@@ -83,6 +83,9 @@ export class DurableEntitySet<TState extends object> {
 
         return DurableEntitySet.updateEntityMetadata(this._entityNameLowerCase, entityKey, metadata);
     }
+
+    // Lower-cased entity class name
+    private readonly _entityNameLowerCase: string;
 
     // Produces a single observable state instance for an existing entity
     static attachEntity<TState extends object>(entityName: string, entityKey: string, initialState: TState): TState {

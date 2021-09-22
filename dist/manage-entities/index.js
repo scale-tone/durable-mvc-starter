@@ -74,17 +74,15 @@ function getEntityStatus(durableClient, entityName, entityKey, callingUser) {
         }
         else {
             const stateContainer = stateResponse.entityState;
-            if (DurableEntityStateContainer_1.DurableEntityStateContainer.isAccessAllowed(stateContainer, callingUser)) {
-                return {
-                    body: {
-                        version: stateContainer.__metadata.version,
-                        state: stateContainer.state
-                    }
-                };
-            }
-            else {
+            if (!DurableEntityStateContainer_1.DurableEntityStateContainer.isAccessAllowed(stateContainer, callingUser)) {
                 return { status: 403 };
             }
+            return {
+                body: {
+                    version: stateContainer.__metadata.version,
+                    state: stateContainer.state
+                }
+            };
         }
     });
 }

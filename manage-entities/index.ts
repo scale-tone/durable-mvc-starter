@@ -85,19 +85,17 @@ async function getEntityStatus(durableClient: DurableOrchestrationClient, entity
 
         const stateContainer = stateResponse.entityState as DurableEntityStateContainer<any>;
 
-        if (DurableEntityStateContainer.isAccessAllowed(stateContainer, callingUser)) {
-            
-            return {
-                body: {
-                    version: stateContainer.__metadata.version,
-                    state: stateContainer.state
-                }
-            };
-
-        } else {
+        if (!DurableEntityStateContainer.isAccessAllowed(stateContainer, callingUser)) {
 
             return { status: 403 };
         }
+
+        return {
+            body: {
+                version: stateContainer.__metadata.version,
+                state: stateContainer.state
+            }
+        };
     }
 }
 
