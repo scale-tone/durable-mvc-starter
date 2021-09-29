@@ -126,7 +126,7 @@ export class DurableEntitySet<TState extends object> {
         // Inside Durable Functions entity names are always lower-case, so we need to convert
         const entityNameLowerCase = entityName.toLowerCase();
 
-        const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}/${entityKey}/${signalName}`;
+        const uri = `${BackendBaseUri}/entities/${encodeURI(entityNameLowerCase)}/${encodeURI(entityKey)}/${encodeURI(signalName)}`;
         return this.HttpClient.post(uri, { content: JSON.stringify(argument) }).then();
     }
 
@@ -136,7 +136,7 @@ export class DurableEntitySet<TState extends object> {
         // Inside Durable Functions entity names are always lower-case, so we need to convert
         const entityNameLowerCase = entityName.toLowerCase();
 
-        const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}/${entityKey}/${signalName}`;
+        const uri = `${BackendBaseUri}/entities/${encodeURI(entityNameLowerCase)}/${encodeURI(entityKey)}/${encodeURI(signalName)}`;
 
         return new Promise<any>((resolve, reject) => {
 
@@ -220,7 +220,7 @@ export class DurableEntitySet<TState extends object> {
 
     private static fetchAndApplyEntityState(entityNameLowerCase: string, entityKey: string, desiredVersion: number, retryCount: number, currentEntityState: any = null): void {
 
-        const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}/${entityKey}`;
+        const uri = `${BackendBaseUri}/entities/${encodeURI(entityNameLowerCase)}/${encodeURI(entityKey)}`;
         this.HttpClient.get(uri).then(response => {
 
             const stateContainer = JSON.parse(response.content as string) as DurableEntityClientStateContainer;
@@ -276,7 +276,7 @@ export class DurableEntitySet<TState extends object> {
         // so that if any entity is removed during the call, it doesn't re-appear.
         const existingEntityStates = this.EntityStates.getStatesCopy();
 
-        const uri = `${BackendBaseUri}/entities/${entityNameLowerCase}`;
+        const uri = `${BackendBaseUri}/entities/${encodeURI(entityNameLowerCase)}`;
         return this.HttpClient.get(uri).then(response => {
 
             for (var item of JSON.parse(response.content as string)) {
