@@ -99,7 +99,7 @@ DurableEntitySet.setup({
 
 Note that `accessTokenFactory` should be a method returning a promise. It will be called every time an access token is needed.
 
-For *demo and test* purposes (e.g. when running everything on your local devbox) you might just want to provide some test user name. Then call method like this:
+For *demo and test* purposes (e.g. when running everything on your local devbox) you might just want to provide some test user name. Then call the `DurableEntitySet.setup()` method like this:
 ```
 DurableEntitySet.setup({
 
