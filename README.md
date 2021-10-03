@@ -78,3 +78,31 @@ To get an [observable collection](https://mobx.js.org/observable-state.html) of 
 To send signals to your entities use: 
 * [DurableEntitySet.signalEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L121) - sends a signal in a fire-and-forget manner. 
 * [DurableEntitySet.callEntity()](https://github.com/scale-tone/durable-mvc-starter/blob/main/ui/src/common/DurableEntitySet.ts#L131) - 'calls' an entity aka returns a Promise, that will be resolved once the sent signal actually gets processed.
+
+# How to handle authentication
+
+To determine which entity instances should be visible to which particular user, backend code needs to be able to identify that user somehow. By default it relies on [Easy Auth module](https://docs.microsoft.com/en-us/azure/app-service/overview-authentication-authorization) while doing that, which means that Easy Auth needs to be [properly configured](https://docs.microsoft.com/en-us/azure/app-service/overview-authentication-authorization) for your Azure Functions app instance (and this instance needs to run in Azure).
+
+When you configure it for so called [server-directed flow](https://docs.microsoft.com/en-us/azure/app-service/overview-authentication-authorization#authentication-flow) (aka cookie-based, aka no client-side SDK involved), then that's basically it - the backend will identify the calling user automatically, using the authentication cookie that comes with each request.
+
+In many cases though you might want to implement client-side authentication with some client-side SDK, e.g. [MSAL](https://www.npmjs.com/package/@azure/msal-browser). In that case the backend will expect an access token to be passed with every request, and you will need to provide that access token by calling the `DurableEntitySet.setup()` method like that:
+```
+DurableEntitySet.setup({
+
+    // Implement this method to provide DurableEntitySet with an access token
+    accessTokenFactory: () => {
+        const myAccessToken = "oauth-access-token-obtained-from-somewhere";
+        return Promise.resolve(myAccessToken);
+    }
+});
+```
+
+Note that `accessTokenFactory` should be a method returning a promise. It will be called every time an access token is needed.
+
+For *demo and test* purposes (e.g. when running everything on your local devbox) you might just want to provide some test user name. Then call method like this:
+```
+DurableEntitySet.setup({
+
+    fakeUserNamePromise: Promise.resolve('test-anonymous-user'),
+});
+```
