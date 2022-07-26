@@ -19,7 +19,8 @@ test('returns index.html by default', async () => {
     context.bindingData = {
         p1: 'some',
         p2: 'path',
-        p3: undefined
+        p3: undefined,
+        invocationId: ''
     };
 
     await serve_statics(context);
@@ -36,7 +37,8 @@ test('returns index.html for arbitrary path', async () => {
     context.bindingData = {
         p1: 'static\\..',
         p2: '\\..',
-        p3: 'package.json'
+        p3: 'package.json',
+        invocationId: ''
     };
 
     await serve_statics(context);    
@@ -55,7 +57,8 @@ test('returns some css', async () => {
     context.bindingData = {
         p1: 'static',
         p2: 'css',
-        p3: cssFileName
+        p3: cssFileName,
+        invocationId: ''
     };
 
     await serve_statics(context);    
@@ -72,7 +75,8 @@ test('returns 404 for invalid path', async () => {
     context.bindingData = {
         p1: 'static',
         p2: 'css',
-        p3: '..\\..\\manifest.json'
+        p3: '..\\..\\manifest.json',
+        invocationId: ''
     };
     
     await serve_statics(context);    

@@ -1,5 +1,4 @@
 import * as DurableFunctions from 'durable-functions';
-import * as fs from 'fs';
 import { Context, HttpRequest } from '@azure/functions';
 
 import { DurableEntityStateContainer } from '../../common/DurableEntityStateContainer';
@@ -18,7 +17,8 @@ const context: Context = {
 
     bindingData: {
         entityName: 'my-entity-name',
-        entityKey: 'my-entity-key'
+        entityKey: 'my-entity-key',
+        invocationId: ''
     }
 };
 

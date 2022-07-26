@@ -7,11 +7,11 @@
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
-    "mobx": "^6.1.8",
-    "mobx-react": "^7.1.0",
+    "mobx": "^6.6.1",
+    "mobx-react": "^7.5.2",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
-    "react-scripts": "^4.0.3",
+    "react-scripts": "^5.0.1",
     "rfc6902": "^4.0.1"
   },
   "scripts": {
